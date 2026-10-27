@@ -1,0 +1,21 @@
+# Reconstruídos pelos scripts — não versionar
+buildroot/
+buildroot-*.tar.*
+buildroot-*/
+output-rpi4/
+*.img
+*.img.gz
+*.log
+
+# Imagem do container: >100 MB (limite do GitHub). O SHA-256 fica em
+# docs/evidence/hashes.txt e o script 03 reconstrói o arquivo.
+flask-app/flask-tp8.tar
+br2-external/board/tp8/rpi4/rootfs-overlay/opt/docker/*.tar
+
+# PDFs das aulas (só referência para quem compila)
+docs/aulas/
+other/
+
+# Configuração local de ferramentas (não é do produto)
+.claude/
+CLAUDE.md
