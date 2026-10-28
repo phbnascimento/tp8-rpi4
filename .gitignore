@@ -1,11 +1,12 @@
 # Reconstruídos pelos scripts — não versionar
 buildroot/
 buildroot-*.tar.*
-buildroot-*/
+buildroot-20*/
 output-rpi4/
 *.img
 *.img.gz
 *.log
+.DS_Store
 
 # Imagem do container (48 MB): é artefato de build, não código-fonte. O script
 # 03 reconstrói uma imagem equivalente a partir do Dockerfile, que fixa as

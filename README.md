@@ -62,7 +62,7 @@ informação: qualquer pessoa com o repositório gera a imagem de novo.
 
 O que o Git não consegue garantir é que o arquivo regerado seja idêntico ao entregue — build de
 Docker não é reprodutível byte a byte (timestamps e metadados de instalação variam). Por isso o
-SHA-256 do artefato efetivamente entregue é registrado em `docs/evidence/hashes.txt`: ele
+SHA-256 do artefato efetivamente entregue é registrado em `evidence/hashes.txt`: ele
 identifica qual tar gerou a imagem apresentada.
 
 ## Em desenvolvimento

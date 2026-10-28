@@ -7,8 +7,7 @@
 #  Hostname e senha do root NÃO ficam aqui: vêm do tp8.env e são gerados
 #  em identidade.fragment pelo próprio 02-configure.sh.
 #
-#  Onde cada opção aparece no "make menuconfig" está comentado ao lado,
-#  para o grupo conseguir explicar na apresentação.
+#  Onde cada opção aparece no "make menuconfig" está comentado ao lado.
 # =====================================================================
 
 # --- System configuration ---------------------------------------------

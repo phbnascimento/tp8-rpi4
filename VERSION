@@ -1,0 +1,10 @@
+projeto: TP Aula 8 - Buildroot + Docker + Flask - Raspberry Pi 4
+versao: 1.0
+grupo: G03
+buildroot: 2026.08.1
+placa: Raspberry Pi 4 Model B (aarch64)
+defconfig: br2-external/configs/tp8_rpi4_defconfig
+hostname: rpi4-tp8-g03
+usuario: aluno
+container: flask-tp8:1.0
+porta: 5000
