@@ -8,8 +8,17 @@ load_env
 
 V="$BUILDROOT_VERSION"
 
+# Lê a versão do Buildroot direto do Makefile dele.
+# Não use "make print-version": esse alvo imprime BR2_VERSION_FULL, que passa
+# pelo support/scripts/setlocalversion e roda "git describe". Como buildroot/
+# fica dentro do repositório do projeto, o git describe acha o NOSSO Git e
+# devolve algo como "-g1a2b3c4" em vez de "2026.08.1".
+br_version() {
+  sed -n 's/^export BR2_VERSION *:= *//p' "$1/Makefile" | head -1 | tr -d '[:space:]'
+}
+
 if [ -f "$BR_DIR/Makefile" ]; then
-  HAVE="$(make -s -C "$BR_DIR" --no-print-directory print-version 2>/dev/null || true)"
+  HAVE="$(br_version "$BR_DIR" 2>/dev/null || true)"
   if [ "$HAVE" = "$V" ]; then
     checkpoint "Buildroot $V já está em $BR_DIR — nada a fazer."
     exit 0
@@ -29,6 +38,6 @@ else
   git clone --depth 1 --branch "$V" https://github.com/buildroot/buildroot.git buildroot
 fi
 
-HAVE="$(make -s -C "$BR_DIR" --no-print-directory print-version)"
+HAVE="$(br_version "$BR_DIR")"
 [ "$HAVE" = "$V" ] || die "versão extraída ($HAVE) diferente da pedida ($V)"
 checkpoint "Buildroot $HAVE em $BR_DIR"
