@@ -4,7 +4,7 @@
 #   - Docker + buildx no host (para construir a imagem ARM64 do Flask)
 #   - emulação ARM64 via binfmt/QEMU (host x86_64)
 # Suporta famílias Debian/Ubuntu (apt-get) e Arch/CachyOS (pacman).
-# Pode rodar quantas vezes quiser. Usa sudo só onde precisa.
+# Idempotente; usa sudo apenas na instalação de pacotes e no serviço do Docker.
 source "$(dirname "$0")/lib.sh"
 require_not_root
 
@@ -101,7 +101,7 @@ fi
 docker buildx create --name tp8builder --use >/dev/null 2>&1 || docker buildx use tp8builder
 docker buildx inspect --bootstrap | grep -i 'platforms' || true
 docker buildx inspect --bootstrap | grep -q 'linux/arm64' \
-  || die "o builder não lista linux/arm64. Veja a seção 'exec format error' no ROTEIRO."
+  || die "o builder não lista linux/arm64: a emulação ARM64 via binfmt/QEMU não está ativa."
 
 FREE_GB=$(df -BG --output=avail "$TP8_ROOT" | tail -1 | tr -dc '0-9')
 if [ "${FREE_GB:-0}" -lt 30 ]; then

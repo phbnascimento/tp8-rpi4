@@ -1,0 +1,4 @@
+# GERADO por scripts/02-configure.sh a partir do tp8.env — não edite à mão
+BR2_TARGET_GENERIC_HOSTNAME="rpi4-tp8-g03"
+BR2_TARGET_GENERIC_ISSUE="TP8 G03"
+BR2_TARGET_GENERIC_ROOT_PASSWD="root00tp8"

@@ -29,7 +29,7 @@ warn()  { echo "${C_WARN}[TP8] ATENÇÃO:${C_END} $*" >&2; }
 die()   { echo "${C_ERR}[TP8] ERRO:${C_END} $*" >&2; exit 1; }
 checkpoint() { echo; echo "${C_OK}[TP8] ✔ CHECKPOINT:${C_END} $*"; echo; }
 
-# Carrega tp8.env removendo CRLF (caso tenha sido editado no Windows).
+# Carrega tp8.env removendo CRLF.
 load_env() {
   local env_file="$TP8_ROOT/tp8.env"
   [ -f "$env_file" ] || die "tp8.env não encontrado em $TP8_ROOT"
