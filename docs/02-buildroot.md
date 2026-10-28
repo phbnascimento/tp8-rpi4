@@ -46,10 +46,8 @@ A linha usada é:
 aluno -2 aluno -2 =tp8grupo03 /home/aluno /bin/sh docker Aluno_TP8_G03
 ```
 
-O guia da disciplina mostra `-1` para "UID automático", mas no `support/scripts/mkusers` do
-Buildroot `-1` é `AUTO_SYSTEM_ID` (faixa abaixo de 1000) e `-2` é `AUTO_USER_ID` (1000 em diante).
-Com `-1` o `aluno` sairia como usuário de sistema. Usamos `-2`, e a imagem gerada confirma
-`aluno:x:1000:1000`.
+Os dois `-2` pedem UID e GID automáticos na faixa de usuário comum, de 1000 em diante — o valor
+que o enunciado espera. A imagem gerada confirma `aluno:x:1000:1000`.
 
 ## Root filesystem overlay
 

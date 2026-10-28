@@ -40,10 +40,9 @@ coletadas logado como `aluno`.
 
 ## Onde as imagens ficam
 
-O `docker load` extrai as camadas em `/var/lib/docker`. Verificamos que `/var/lib` é um diretório
-real no rootfs ext4, e não um link para `tmpfs` como vários outros subdiretórios de `/var`
-(`cache`, `log`, `run`, `spool`, `tmp` são links). Consequência prática: **a imagem carregada
-sobrevive ao desligamento**, e o `docker load` só precisa acontecer uma vez, no primeiro boot.
+O `docker load` extrai as camadas em `/var/lib/docker`, que fica no rootfs e é gravável. Por isso
+**a imagem carregada sobrevive ao desligamento** e o carregamento só precisa acontecer uma vez, no
+primeiro boot.
 
 ## Inicialização automática
 
@@ -67,14 +66,9 @@ Construída com `docker buildx --platform linux/arm64` a partir de `flask-app/Do
 `python:3.12.15-slim-bookworm` e `Flask==3.1.3`. Uma imagem amd64 daria `exec format error` na Pi,
 porque os binários rodam direto na CPU Cortex-A72.
 
-Dois detalhes que o `scripts/03-build-flask-image.sh` verifica, por serem causas silenciosas de
-falha só perceptíveis na placa:
-
-- **arquitetura**: `docker image inspect` tem que responder `arm64/linux`;
-- **formato do tar**: o `docker load` da Pi precisa de `docker-archive`, com `manifest.json` na
-  raiz do tar. Por isso o build usa `--provenance=false --sbom=false`: sem isso o buildx acrescenta
-  manifests de atestação e, dependendo da versão do Docker do host, o tar sai em formato OCI puro,
-  que a Pi recusa.
+O `scripts/03-build-flask-image.sh` confere a arquitetura da imagem antes de exportá-la e também
+que o arquivo exportado está no formato que a Raspberry consegue carregar — as duas causas de falha
+que só apareceriam com a placa na mesa.
 
 O tar fica fora do Git (48 MB, artefato de build) com o SHA-256 registrado em
 [../evidence/hashes.txt](../evidence/hashes.txt). O PDF do TP prevê esse caminho: artefatos

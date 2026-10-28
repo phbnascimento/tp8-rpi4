@@ -299,8 +299,7 @@ ficam em [evidence/build/](evidence/build/):
 | Problema | Solução |
 |---|---|
 | O `00-setup-host.sh` era só `apt-get` e morria no host Arch do grupo | passou a detectar `apt-get`/`pacman`; no Arch instala `base-devel` e `docker-buildx` e ativa o `docker.service`, que lá não vem habilitado |
-| A árvore extraída como `buildroot-2026.08.1/` não casava com o caminho `buildroot/` esperado pelos scripts, e o `.gitignore` não a cobria | pasta renomeada, versão fixada no `tp8.env` e padrão acrescentado ao `.gitignore` |
-| O padrão `buildroot-*/` do `.gitignore` passou a esconder o diretório `buildroot-config/` | padrão restringido para `buildroot-20*/` |
+| A árvore extraída do Buildroot não casava com o caminho esperado pelos scripts | pasta padronizada como `buildroot/` e versão fixada no `tp8.env` |
 
 ### Encontrados em revisão, antes de quebrarem
 
@@ -308,12 +307,11 @@ Todos eram falhas que só apareceriam com a Raspberry na mesa, depois de horas d
 
 | Problema | Solução |
 |---|---|
-| O `/etc/network/interfaces` do overlay tinha só duas diretivas. Como o overlay é copiado **depois** dos pacotes, ele sobrescrevia o arquivo gerado pelo `BR2_SYSTEM_DHCP` e perdia o `wait-delay 15` — sem essa espera o `udhcpc` pode rodar antes de o link subir e a `eth0` fica sem IP | o arquivo do overlay passou a conter as quatro diretivas completas, idênticas às geradas; o script 04 confere o `wait-delay` no rootfs final |
-| O script 04 procurava o usuário em `output-rpi4/target/etc/passwd`, mas o `mkusers` roda sob fakeroot numa **cópia** do target, apagada após gerar a imagem. A checagem falharia sempre, no fim do build | o 04 passou a ler `/etc/passwd` e `/etc/group` de dentro de `images/rootfs.ext4` com `debugfs`, conferindo o artefato real |
-| O host de build roda Docker 29 e a Pi roda 28.5.2. O `buildx` acrescenta manifests de atestação por padrão, e o `docker load` da Pi poderia recusar o tar | `--provenance=false --sbom=false` e checagem de `manifest.json` na raiz do tar |
-| Opções do fragment de kernel com dependência não satisfeita são descartadas em silêncio pelo kconfig — só apareceriam como `WARNING` no `docker info`, já na Pi | o script 04 roda o `check-config.sh` do Docker contra o `.config` gerado e falha se faltar algo obrigatório |
-| O `CONFIG_BRIDGE=y` foi rebaixado para `=m`: ele tem `depends on IPV6 \|\| IPV6=n` e o `bcm2711_defconfig` traz `CONFIG_IPV6=m` | mantido como módulo, que é seguro: o alvo tem `kmod`, o `depmod` roda no build e o `check-config.sh` aceita *as module*. Documentado no fragment |
-| O `docker load` extrai as camadas no mesmo ext4 de 1024 MB, e nada verificava o espaço livre | o script 04 compara o espaço livre com o tamanho do tar e avisa |
+| O `/etc/network/interfaces` do overlay estava incompleto e, por ser copiado depois dos pacotes, sobrescrevia o arquivo gerado — perdendo a espera pelo link da `eth0`, que sem ela pode ficar sem IP no boot | o arquivo do overlay passou a conter as diretivas completas, e o script 04 confere a espera na imagem final |
+| A conferência do usuário era feita num diretório intermediário do build, onde ele nunca aparece | passou a ser feita na imagem gerada, que é o artefato real |
+| A imagem do container podia sair num formato que a Raspberry não carrega | o script 03 confere a arquitetura e o formato do arquivo exportado antes de seguir |
+| Um recurso de kernel exigido pelo Docker podia ficar de fora sem aviso | o script 04 roda a verificação que o próprio Docker distribui e falha se faltar algo obrigatório |
+| Nada verificava se sobrava espaço no rootfs para carregar o container no primeiro boot | o script 04 compara o espaço livre com o tamanho da imagem do container |
 
 ## Limitações conhecidas
 

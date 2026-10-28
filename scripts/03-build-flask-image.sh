@@ -10,10 +10,7 @@ docker buildx use tp8builder 2>/dev/null || docker buildx create --name tp8build
 
 info "Arquitetura do host: $(uname -m) → construindo para linux/arm64"
 cd "$FLASK_DIR"
-# --provenance/--sbom=false: sem isto o buildx acrescenta manifests de atestação
-# ("unknown/unknown") ao índice da imagem. O host de build pode rodar um Docker
-# mais novo (29.x) que a Pi (28.5.2, image store clássico), e lá o "docker load"
-# recusaria o tar. Desligar as atestações mantém a imagem no formato que a Pi lê.
+# As opções abaixo mantêm a imagem no formato que a Raspberry consegue carregar.
 docker buildx build --platform linux/arm64 --provenance=false --sbom=false \
   -t "$IMAGE_REF" --load .
 
@@ -38,12 +35,11 @@ info "Container respondeu: $RESP ✔"
 info "Exportando com docker save..."
 docker save "$IMAGE_REF" -o "$FLASK_DIR/$IMAGE_TAR_NAME"
 
-# O "docker load" da Pi precisa do formato docker-archive, que tem manifest.json
-# na raiz do tar. Um tar só com índice OCI (oci-layout/blobs) não carrega lá.
+# Confere que o arquivo exportado está no formato que a Raspberry carrega.
 tar -tf "$FLASK_DIR/$IMAGE_TAR_NAME" manifest.json >/dev/null 2>&1 \
-  || die "o $IMAGE_TAR_NAME saiu sem manifest.json na raiz (formato OCI puro).
-  A Pi (Docker 28.5.2) não consegue fazer 'docker load' nesse formato."
-info "Formato do tar: docker-archive (manifest.json presente) ✔"
+  || die "o $IMAGE_TAR_NAME saiu num formato que a Raspberry não carrega.
+  Confira a versão do Docker do host e refaça este passo."
+info "Formato do arquivo exportado conferido ✔"
 
 cp "$FLASK_DIR/$IMAGE_TAR_NAME" "$OVERLAY_DIR/opt/docker/$IMAGE_TAR_NAME"
 record_hash "$OVERLAY_DIR/opt/docker/$IMAGE_TAR_NAME" "$IMAGE_TAR_NAME"

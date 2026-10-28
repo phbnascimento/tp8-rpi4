@@ -77,9 +77,8 @@ O `04` não termina sem verificar o artefato real, lendo o `images/rootfs.ext4` 
   (saída em [../evidence/build/kernel-check-config.txt](../evidence/build/kernel-check-config.txt));
 - espaço livre suficiente no rootfs para o `docker load` do primeiro boot.
 
-A verificação lê a imagem, e não o diretório `output-rpi4/target`, por um motivo concreto: o
-`mkusers` roda sob `fakeroot` sobre uma **cópia** do target, que o Buildroot apaga ao final. O
-usuário nunca aparece em `output-rpi4/target/etc/passwd`, e uma checagem feita ali falharia sempre.
+A verificação é feita na imagem gerada, e não no diretório intermediário de build: só a imagem é o
+artefato real, e é nela que o usuário existe.
 
 ## Artefatos e hashes
 

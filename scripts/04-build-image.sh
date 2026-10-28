@@ -38,14 +38,11 @@ for f in etc/issue etc/network/interfaces etc/init.d/S60dockerd etc/init.d/S99fl
   [ -e "$T/$f" ] || die "não encontrei /$f no rootfs final (output-rpi4/target)"
 done
 load_env
-# /etc/network/interfaces: o BR2_SYSTEM_DHCP gera o arquivo e a cópia do overlay
-# o sobrescreve com o mesmo conteúdo. O "wait-delay" espera o link da eth0 subir
-# antes do udhcpc; esta checagem garante que ele sobreviveu à cópia.
+# A espera pelo link da eth0 precisa sobreviver à cópia do overlay: sem ela a
+# interface pode ficar sem IP no boot.
 grep -q 'wait-delay' "$T/etc/network/interfaces" \
-  || die "/etc/network/interfaces do target está sem 'wait-delay' — algo no overlay sobrescreveu o arquivo gerado pelo BR2_SYSTEM_DHCP"
-# O mkusers roda sob fakeroot sobre uma CÓPIA do target (build/buildroot-fs/ext2/target),
-# que o Buildroot apaga depois de gerar a imagem (fs/common.mk). Por isso o usuário NÃO
-# aparece em output-rpi4/target/etc/passwd: é preciso conferir dentro do artefato real.
+  || die "/etc/network/interfaces está sem a espera pelo link da eth0 (wait-delay)"
+# O usuário é criado ao gerar a imagem, então a conferência é feita dentro dela.
 DEBUGFS="$OUT_DIR/host/sbin/debugfs"
 ROOTFS_EXT4="$OUT_DIR/images/rootfs.ext4"
 if [ -x "$DEBUGFS" ] && [ -f "$ROOTFS_EXT4" ]; then
@@ -67,9 +64,8 @@ else
 fi
 
 # --- Checagens que evitam descobrir o problema só na Pi -------------------
-# 1) O kernel ficou mesmo com tudo que o Docker precisa? Opções do
-#    linux-docker.fragment com dependência não satisfeita são descartadas EM
-#    SILÊNCIO pelo kconfig, e isso só apareceria como WARNING no "docker info".
+# 1) O kernel ficou com tudo que o Docker precisa? Um recurso pode acabar de
+#    fora sem aviso, e isso só apareceria na Raspberry.
 KCONF="$OUT_DIR/build/linux-custom/.config"
 CHECKCFG="$(ls -d "$OUT_DIR"/build/docker-engine-*/contrib/check-config.sh 2>/dev/null | head -1 || true)"
 if [ -r "$KCONF" ] && [ -r "${CHECKCFG:-/nonexistent}" ]; then

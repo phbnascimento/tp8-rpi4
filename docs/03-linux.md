@@ -31,26 +31,14 @@ Impacto:      kernel um pouco maior e mais tempo de compilação; sem ele o
 As opções `IP_NF_*` são da família *legacy* (xtables) porque o `iptables` que o Buildroot instala
 junto com o `docker-engine` é o legacy, não o `nft`.
 
-## Um achado que vale conhecer
+## Como sabemos que o kernel ficou correto
 
-Pedir `=y` num fragment **não garante** que a opção fique embutida. O kconfig rebaixa em silêncio
-para `=m` quando uma dependência é módulo. É o que acontece aqui:
+Parte desses recursos pode ficar como módulo em vez de embutida no kernel, o que é suportado: o
+sistema carrega o módulo quando o Docker precisa dele.
 
-```
-CONFIG_BRIDGE tem "depends on IPV6 || IPV6=n"
-o bcm2711_defconfig traz CONFIG_IPV6=m
-→ CONFIG_BRIDGE e CONFIG_BRIDGE_NETFILTER saem como =m, mesmo pedindo =y
-```
+Para não depender de inspeção manual, o `scripts/04-build-image.sh` roda a verificação que o
+próprio Docker distribui contra o kernel gerado, e falha se faltar algum recurso obrigatório. A
+saída fica em [../evidence/build/kernel-check-config.txt](../evidence/build/kernel-check-config.txt).
 
-Isso é seguro neste projeto: o alvo tem `kmod` (`/sbin/modprobe`), o `depmod` roda durante o build
-e o `liblzma` está no rootfs, então o `dockerd` carrega `bridge.ko.xz` e `br_netfilter.ko.xz` sob
-demanda. O `check-config.sh` do próprio Docker aceita a resposta *as module*. Forçar built-in
-exigiria `CONFIG_IPV6=y`, o que não compensa.
-
-O perigo do rebaixamento silencioso é não perceber que aconteceu. Por isso o
-`scripts/04-build-image.sh` roda o `check-config.sh` distribuído com o `docker-engine` contra o
-`.config` gerado e falha se faltar algo da seção *Generally Necessary*. A saída fica em
-[../evidence/build/kernel-check-config.txt](../evidence/build/kernel-check-config.txt).
-
-Na Raspberry, a verificação equivalente é o `docker info`: recursos ausentes aparecem como linhas
-`WARNING: No ... support`.
+Na Raspberry, a verificação equivalente é o `docker info`: recursos ausentes apareceriam como
+avisos.
