@@ -1,0 +1,17 @@
+# eth0 por DHCP — exigido pelo checklist do TP ("/etc/issue e
+# /etc/network/interfaces presentes no overlay").
+#
+# ATENÇÃO: este conteúdo é IGUAL ao que o BR2_SYSTEM_DHCP="eth0" gera. O overlay
+# é copiado DEPOIS dos pacotes, então ele sobrescreve o arquivo gerado — se
+# alguém simplificar este arquivo e tirar o "wait-delay 15", o udhcpc pode rodar
+# antes do link da eth0 subir e a placa fica sem IP no boot. Mantenha as quatro
+# diretivas abaixo. O script 04 confere o wait-delay no rootfs final.
+
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+  pre-up /etc/network/nfs_check
+  wait-delay 15
+  hostname $(hostname)
