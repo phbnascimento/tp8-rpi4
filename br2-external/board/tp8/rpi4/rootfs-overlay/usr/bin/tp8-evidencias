@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# tp8-evidencias — roda NA RASPBERRY e junta numa tacada as saídas que o
+# guia da Aula 10 (Etapa 12.6) pede como evidência.
+#
+# Uso:  tp8-evidencias            (grava em ~/evidencias-tp8.txt e mostra na tela)
+#
+# Para tirar o arquivo da Pi: desligue, coloque o microSD no PC Linux e copie
+# /home/<usuario>/evidencias-tp8.txt da partição rootfs (a 2ª partição).
+# Rode de novo depois de cada reboot: as execuções são acumuladas no arquivo.
+
+OUT="${HOME:-/tmp}/evidencias-tp8.txt"
+
+run() {
+	echo
+	echo "\$ $*"
+	"$@" 2>&1
+}
+
+{
+	echo "================================================================"
+	echo " TP8 — evidências  |  boot #$(cat /proc/sys/kernel/random/boot_id 2>/dev/null | cut -c1-8)"
+	echo " uptime: $(cut -d' ' -f1 /proc/uptime)s  (o relógio da Pi não tem RTC; data pode estar errada)"
+	echo "================================================================"
+	run hostname
+	run whoami
+	run id
+	run uname -a
+	run cat /etc/issue
+	run ip addr show eth0
+	run ip route
+	run docker version
+	run docker info
+	run docker images
+	run docker ps -a
+	run docker network ls
+	run docker inspect flask-tp8
+	run sha256sum /opt/docker/flask-tp8.tar
+	run curl -s http://127.0.0.1:5000
+	echo
+} | tee -a "$OUT"
+
+echo
+echo "[TP8] evidências acrescentadas em $OUT"
+IP="$(ip -4 addr show eth0 2>/dev/null | awk '/inet /{sub(/\/.*/,"",$2); print $2; exit}')"
+[ -n "$IP" ] && echo "[TP8] no notebook, abra: http://$IP:5000"
