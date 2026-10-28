@@ -108,6 +108,46 @@ Impacto:      acrescenta poucos MB ao rootfs; sem ele o teste local exigiria
 As opções de Docker estão em [04-docker.md](04-docker.md) e as de kernel em
 [03-linux.md](03-linux.md).
 
+## Decisão descartada: compilador Go no alvo
+
+Foi cogitado incluir o compilador Go na imagem, pensando em futuras expansões do projeto. A ideia
+foi descartada por custo de espaço.
+
+O Buildroot não oferece o Go como pacote de alvo — o diretório `package/go/` só tem
+`Config.in.host`, com `BR2_PACKAGE_HOST_GO`. O Go 1.27.2 que este projeto já compila é ferramenta
+**de build**, usada para construir o `docker-engine` e o `containerd` no PC; ele não vai para a
+Raspberry. Pôr o compilador no alvo exigiria escrever um pacote próprio no `br2-external`,
+instalando o toolchain oficial `linux-arm64`.
+
+Medindo a instalação que o Buildroot já produz:
+
+| Componente | Tamanho |
+|---|---|
+| `src` (fontes da biblioteca padrão) | 157 MB |
+| `pkg` | 135 MB |
+| `bin` (compilador e ferramentas) | 20 MB |
+| `lib` | 1,8 MB |
+| **Total** | **313 MB** |
+
+Uma instalação mínima, sem as fontes, ficaria em torno de 156 MB.
+
+Hoje o rootfs usa 258 MB dos 1024 MB, e o `docker load` do primeiro boot ainda consome cerca de
+150 MB ao extrair as camadas do container em `/var/lib/docker`. Acrescentar 313 MB levaria o
+sistema a usar aproximadamente 720 MB dos 1024 MB — caberia, mas com folga pequena demais para
+qualquer crescimento, e o prudente seria dobrar o rootfs para 2048 MB, o que dobraria também o
+tamanho do `sdcard.img`.
+
+**Decisão:** o compilador não entra na imagem. Programas em Go para este sistema serão
+compilados de forma cruzada no PC, com alvo AArch64 / Cortex-A72, e apenas o binário pronto será
+colocado no overlay numa expansão futura:
+
+```sh
+GOOS=linux GOARCH=arm64 go build -o meu-programa
+```
+
+Essa também é a prática comum em sistemas embarcados: o alvo executa, o PC compila. Um compilador
+no dispositivo só se justifica quando é preciso compilar na própria placa.
+
 ## Reprodutibilidade da configuração
 
 O `scripts/02-configure.sh` termina apagando o `.config` e recarregando a defconfig salva, e falha

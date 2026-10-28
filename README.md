@@ -1,15 +1,15 @@
 # TP Aula 8 — Buildroot + Docker + Flask na Raspberry Pi 4
 
 **Disciplina:** Sistemas Embarcados · Engenharia de Computação · UNISANTA
-**Professor:** Sergio Schina
-**Grupo:** G03
 
-| Integrante | RA |
-|---|---|
-| Pedro Cretella | 226013 |
-| Pedro Brito | 226146 |
-| Vinícius Regis | 230610 |
-| Rafael Lima | 226326 |
+**Professor:** Sergio Schina · Grupo 3
+
+| Integrante      | RA     |
+|-----------------|--------|
+| Pedro Cretella  | 226013 |
+| Pedro Brito     | 226146 |
+| Vinícius Regis  | 230610 |
+| Rafael Lima     | 226326 |
 
 ## Objetivo
 
@@ -331,6 +331,10 @@ Todos eram falhas que só apareceriam com a Raspberry na mesa, depois de horas d
 - **Build de Docker não é reprodutível byte a byte**, então reconstruir o projeto gera uma imagem
   funcionalmente equivalente, mas com outro SHA-256.
 - **O primeiro boot é lento** e aparenta travamento durante o `docker load`.
+- **Não há compilador no alvo.** Incluir o Go foi cogitado e descartado: a instalação ocupa 313 MB,
+  contra 258 MB que o sistema inteiro usa hoje. Programas para esta placa devem ser compilados de
+  forma cruzada no PC, com alvo AArch64 / Cortex-A72. O raciocínio completo está em
+  [docs/02-buildroot.md](docs/02-buildroot.md).
 
 ## Versão final entregue
 
