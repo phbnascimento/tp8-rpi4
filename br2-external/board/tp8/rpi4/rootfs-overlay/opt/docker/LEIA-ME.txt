@@ -1,0 +1,4 @@
+O arquivo flask-tp8.tar entra nesta pasta pelo script scripts/03-build-flask-image.sh.
+Ele NAO vai pro Git: tem 48 MB e e artefato de build, nao codigo-fonte. O Dockerfile
+fixa as versoes da imagem base e do Flask, entao o script 03 reconstroi o mesmo
+conteudo. O SHA-256 do arquivo entregue fica em docs/evidence/hashes.txt.

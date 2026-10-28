@@ -47,6 +47,24 @@ O `tp8.env` é o único arquivo com parâmetros do grupo. Os demais arquivos mar
 são produzidos a partir dele, para que grupo, hostname, usuário e banner nunca fiquem divergentes
 entre si.
 
+## O que não é versionado, e por quê
+
+| Fora do Git | Motivo |
+|---|---|
+| `buildroot/`, `output-rpi4/`, `*.img` | artefatos de build, reconstruídos pelos scripts |
+| `flask-tp8.tar` (48 MB) | artefato de build, não código-fonte (ver abaixo) |
+
+A imagem do container é gerada pelo build, não escrita por nós: o que define o container é o
+`Dockerfile` com as versões fixas da imagem base e do Flask, mais o `app.py` e o
+`requirements.txt` — e esses três **estão** versionados. Guardar também o `.tar` acrescentaria
+48 MB binários ao histórico do Git a cada vez que a imagem fosse reconstruída, sem acrescentar
+informação: qualquer pessoa com o repositório gera a imagem de novo.
+
+O que o Git não consegue garantir é que o arquivo regerado seja idêntico ao entregue — build de
+Docker não é reprodutível byte a byte (timestamps e metadados de instalação variam). Por isso o
+SHA-256 do artefato efetivamente entregue é registrado em `docs/evidence/hashes.txt`: ele
+identifica qual tar gerou a imagem apresentada.
+
 ## Em desenvolvimento
 
 Este repositório está sendo construído por etapas. O histórico de commits acompanha a ordem do
