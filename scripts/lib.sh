@@ -12,7 +12,9 @@ EXT_DIR="$TP8_ROOT/br2-external"
 BOARD_DIR="$EXT_DIR/board/tp8/rpi4"
 OVERLAY_DIR="$BOARD_DIR/rootfs-overlay"
 FLASK_DIR="$TP8_ROOT/flask-app"
-EVID_DIR="$TP8_ROOT/docs/evidence"
+EVID_DIR="$TP8_ROOT/evidence"
+EVID_BUILD_DIR="$EVID_DIR/build"
+BRCFG_DIR="$TP8_ROOT/buildroot-config"
 DEFCONFIG_NAME="tp8_rpi4_defconfig"
 
 IMAGE_REF="flask-tp8:1.0"
@@ -70,7 +72,7 @@ require_not_root() {
   [ "$(id -u)" -ne 0 ] || die "não rode este script como root/sudo (o Buildroot não deve rodar como root)"
 }
 
-# Registra um hash em docs/evidence/hashes.txt (substitui linha antiga do mesmo arquivo).
+# Registra um hash em evidence/hashes.txt (substitui linha antiga do mesmo arquivo).
 record_hash() {
   local file="$1" label="$2" hash
   hash="$(sha256sum "$file" | awk '{print $1}')"
@@ -79,5 +81,5 @@ record_hash() {
   grep -v "  $label\$" "$EVID_DIR/hashes.txt" > "$EVID_DIR/hashes.txt.tmp" || true
   echo "$hash  $label" >> "$EVID_DIR/hashes.txt.tmp"
   mv "$EVID_DIR/hashes.txt.tmp" "$EVID_DIR/hashes.txt"
-  info "SHA-256 $label = $hash  (salvo em docs/evidence/hashes.txt)"
+  info "SHA-256 $label = $hash  (salvo em evidence/hashes.txt)"
 }

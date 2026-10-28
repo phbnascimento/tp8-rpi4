@@ -18,7 +18,7 @@
 #  a pena só por isso.
 #
 #  Validação: o script 04 roda o check-config.sh do Docker contra o .config
-#  gerado (docs/evidence/kernel-check-config.txt). Na Pi: docker info
+#  gerado (evidence/build/kernel-check-config.txt). Na Pi: docker info
 #  (avisos "WARNING: No ... support").
 # =====================================================================
 
