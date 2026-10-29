@@ -274,9 +274,18 @@ Procedimento completo e tabela de diagnóstico por sintoma em [docs/07-testes.md
 
 ## Evidências
 
-Em [evidence/](evidence/): capturas do banner e do login, saídas dos comandos acima, print do
-navegador do notebook e os SHA-256 dos artefatos. As conferências que os scripts fazem no host
-ficam em [evidence/build/](evidence/build/):
+O sistema foi validado na Raspberry Pi 4 física. Registrado em [evidence/](evidence/):
+
+| Arquivo | O que comprova |
+|---|---|
+| `login/01-banner-login.jpg` | banner do grupo exibido antes do login, e o Docker criando a rede do container ainda durante o boot |
+| `login/02-hostname-whoami-ip.jpg` | `hostname`, `whoami` e o endereço obtido por DHCP na `eth0` |
+| `login/03-banner-login-completo.jpg` | banner, login e teste local na mesma tela |
+| `network/04-curl-local.jpg` | aplicação respondendo a mensagem exigida na própria placa |
+| `network/05-curl-local-detalhe.jpg` | segundo registro do teste local |
+
+Os SHA-256 dos artefatos estão em [evidence/hashes.txt](evidence/hashes.txt), e as conferências
+que os scripts fazem no host, em [evidence/build/](evidence/build/):
 
 - [usuarios-na-imagem.txt](evidence/build/usuarios-na-imagem.txt) — `/etc/passwd` e `/etc/group`
   lidos de dentro do `rootfs.ext4` com `debugfs`;
@@ -315,10 +324,13 @@ Todos eram falhas que só apareceriam com a Raspberry na mesa, depois de horas d
 
 ## Limitações conhecidas
 
-- **Validação em hardware pendente.** A imagem foi verificada por inspeção do artefato gerado —
-  usuário, grupo, banner, rede, scripts de init e tar do container lidos de dentro do
-  `rootfs.ext4`, e kernel aprovado no `check-config.sh` do Docker. O boot numa Raspberry física e
-  os três ciclos de reboot ainda não foram executados, e as pastas de `evidence/` estão vazias.
+- **Acesso de outro equipamento não registrado.** Na rede onde a placa foi validada, a faixa do
+  cabo e a do Wi-Fi são sub-redes isoladas entre si, então nenhum outro aparelho disponível no
+  momento alcançava a Raspberry. A aplicação responde na própria placa, e a porta está publicada
+  pelo Docker; o que falta é a captura feita de fora.
+- **Nem todas as saídas de comando foram fotografadas.** As evidências registradas estão em
+  `evidence/`; as demais constam dos procedimentos de teste e podem ser reproduzidas com a placa
+  ligada.
 - **Senhas em texto claro** no `tp8.env` e, por consequência, no repositório. Aceitável apenas
   neste TP, como o próprio enunciado indica; um produto real usaria hash e provisionamento.
 - **A interface `eth0` aparece em dois lugares** — no `BR2_SYSTEM_DHCP` e escrita à mão no
