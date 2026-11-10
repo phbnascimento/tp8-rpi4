@@ -56,6 +56,69 @@ if command -v tar >/dev/null 2>&1; then
     | grep -q "\"$IMAGE_REF\"" \
     || die "$IMAGE_TAR_NAME não contém a imagem $IMAGE_REF — rode ./scripts/03-build-flask-image.sh"
 fi
+
+# --- HC-SR04: driver, overlay e partição de boot -------------------------
+# Nada disto dá para testar sem a placa, então cada peça é conferida aqui.
+
+# 1. O .dtbo versionado tem de corresponder ao .dts. Sem esta conferência, um
+#    .dts editado e um .dtbo esquecido passam despercebidos até o boot.
+DTC="$OUT_DIR/host/bin/dtc"
+if [ -x "$DTC" ]; then
+  DTBO_TMP="$(mktemp)"
+  "$DTC" -@ -I dts -O dtb -o "$DTBO_TMP" "$BOARD_DIR/hcsr04-overlay.dts" 2>/dev/null \
+    || die "hcsr04-overlay.dts não compila"
+  cmp -s "$DTBO_TMP" "$BOARD_DIR/hcsr04.dtbo" \
+    || { rm -f "$DTBO_TMP"; die "hcsr04.dtbo está desatualizado em relação ao .dts.
+  Regere com: $DTC -@ -I dts -O dtb -o $BOARD_DIR/hcsr04.dtbo $BOARD_DIR/hcsr04-overlay.dts"; }
+  rm -f "$DTBO_TMP"
+fi
+
+# 2. O módulo precisa estar no rootfs e o vermagic bater com o kernel desta
+#    imagem. Módulo compilado contra outro kernel é o erro clássico, e só
+#    apareceria como modprobe falhando no boot.
+KVER="$(ls "$T/lib/modules" 2>/dev/null | head -1)"
+[ -n "$KVER" ] || die "não há /lib/modules no rootfs"
+KO="$(find "$T/lib/modules/$KVER" -name 'hcsr04.ko*' | head -1)"
+[ -n "$KO" ] || die "hcsr04.ko não foi instalado em /lib/modules/$KVER
+  (o pacote está selecionado? confira BR2_PACKAGE_HCSR04_DRIVER no .config)"
+grep -q "hcsr04" "$T/lib/modules/$KVER/modules.dep" \
+  || die "hcsr04 não aparece em modules.dep — o modprobe não vai encontrá-lo"
+
+KO_PLAIN="$KO"
+case "$KO" in
+  *.xz) KO_PLAIN="$(mktemp)"; xz -dc "$KO" > "$KO_PLAIN" ;;
+esac
+VERMAGIC="$("$OUT_DIR/host/bin/aarch64-linux-objcopy" -O binary -j .modinfo "$KO_PLAIN" /dev/stdout 2>/dev/null \
+  | tr '\0' '\n' | sed -n 's/^vermagic=//p' | cut -d' ' -f1)"
+[ "$KO_PLAIN" = "$KO" ] || rm -f "$KO_PLAIN"
+[ "$VERMAGIC" = "$KVER" ] \
+  || die "vermagic do hcsr04.ko ($VERMAGIC) não bate com o kernel da imagem ($KVER).
+  O módulo foi compilado contra outro kernel: rode 'make -C buildroot O=../output-rpi4 hcsr04-driver-dirclean' e gere de novo."
+
+# 3. Módulos comprimidos só carregam se o modprobe souber descomprimir. O kmod
+#    do Buildroot faz isso por dlopen, então a biblioteca tem de estar no alvo.
+case "$KO" in
+  *.xz) [ -e "$T/usr/lib/liblzma.so.5" ] \
+    || die "os módulos estão comprimidos em xz mas liblzma.so.5 não está no alvo: o modprobe falharia no boot" ;;
+esac
+
+# 4. O overlay precisa chegar à partição de boot, e o config.txt precisa mandar
+#    carregá-lo. Mudar BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE não reinstala o
+#    pacote sozinho, então este é um erro fácil de cometer e invisível.
+FW="$OUT_DIR/images/rpi-firmware"
+[ -f "$FW/overlays/hcsr04.dtbo" ] \
+  || die "hcsr04.dtbo não está em images/rpi-firmware/overlays — o post-image.sh do TP rodou?"
+# E a cópia instalada tem de ser a versionada: é dela que o genimage monta a
+# boot.vfat, e uma cópia velha ali sobrevive a mudanças no .dts.
+cmp -s "$FW/overlays/hcsr04.dtbo" "$BOARD_DIR/hcsr04.dtbo" \
+  || die "o hcsr04.dtbo instalado em images/rpi-firmware/overlays difere do versionado"
+for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04'; do
+  grep -qxF "$linha" "$FW/config.txt" \
+    || die "o config.txt da imagem está sem \"$linha\".
+  Se você mudou config_tp.txt, o pacote precisa ser reinstalado:
+    make -C buildroot O=../output-rpi4 BR2_EXTERNAL=../br2-external rpi-firmware-reinstall all"
+done
+
 load_env
 # A espera pelo link da eth0 precisa sobreviver à cópia do overlay: sem ela a
 # interface pode ficar sem IP no boot.

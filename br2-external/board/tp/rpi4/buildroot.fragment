@@ -42,3 +42,21 @@ BR2_TARGET_ROOTFS_EXT2_SIZE="1024M"
 # --- Kernel → Additional configuration fragment files ------------------
 # Garante namespaces, cgroups, veth, bridge, netfilter/NAT e overlayfs.
 BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/linux-docker.fragment"
+
+# --- Target packages → Pacotes do TP ----------------------------------
+# Driver do HC-SR04. Compilado como módulo externo contra o kernel deste
+# projeto, pela infraestrutura kernel-module do Buildroot.
+BR2_PACKAGE_HCSR04_DRIVER=y
+
+# --- Bootloaders → rpi-firmware → config.txt --------------------------
+# Nosso config.txt: é a cópia de board/raspberrypi4-64/config_4_64bit.txt
+# (64 bits, kernel=Image, arm_64bit=1) acrescida de "dtoverlay=hcsr04".
+# Cuidado: o guia manda copiar config_4.txt, que é a variante de 32 bits e
+# não dá boot nesta configuração.
+BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/config_tp.txt"
+
+# --- System configuration → Custom scripts to run after creating images -
+# O primeiro script copia hcsr04.dtbo para overlays/ da partição de boot; o
+# segundo é o da própria Raspberry, que chama o genimage e monta a imagem.
+# A ordem é essencial: o genimage varre images/rpi-firmware/ quando roda.
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/post-image.sh board/raspberrypi4-64/post-image.sh"

@@ -85,6 +85,23 @@ check 'BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/rootfs-overlay"
 check 'BR2_ROOTFS_USERS_TABLES="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/users_table.txt"'
 # shellcheck disable=SC2016
 check 'BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/linux-docker.fragment"'
+check 'BR2_PACKAGE_HCSR04_DRIVER=y'
+# O pacote do driver depende do kernel (depends on BR2_LINUX_KERNEL no
+# Config.in). Se o kernel saísse da configuração, o símbolo acima some sem
+# avisar, então conferir os dois deixa o erro claro.
+check 'BR2_LINUX_KERNEL=y'
+# shellcheck disable=SC2016
+check 'BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/config_tp.txt"'
+# shellcheck disable=SC2016
+check 'BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/post-image.sh board/raspberrypi4-64/post-image.sh"'
+
+# O config.txt que vai para a placa tem de ser o de 64 bits. O guia do TP manda
+# copiar config_4.txt, que é a variante de 32 bits: com ela a imagem não dá
+# boot. Esta conferência existe para impedir que alguém "siga o guia" e quebre.
+for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04'; do
+  grep -qxF "$linha" "$BOARD_DIR/config_tp.txt" \
+    || die "config_tp.txt está sem a linha \"$linha\""
+done
 
 # --- 5. Salva a defconfig do TP -------------------------------------------
 br_make BR2_DEFCONFIG="$EXT_DIR/configs/$DEFCONFIG_NAME" savedefconfig
