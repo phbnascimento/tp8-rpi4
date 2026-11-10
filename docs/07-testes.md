@@ -22,11 +22,11 @@ container volta depois de reiniciar — isso só o hardware demonstra.
 2. Montar: microSD → cabo Ethernet no mesmo roteador do notebook → monitor e teclado → fonte por
    último.
 3. Aguardar o boot. **No primeiro boot a tela fica parada por 1 a 2 minutos** na mensagem
-   `[TP8] carregando imagem Docker`: é o `docker load` dos 48 MB. Não desligar a placa nesse
+   `[TP] carregando imagem Docker`: é o `docker load` dos 48 MB. Não desligar a placa nesse
    momento.
 4. Conferir o banner do grupo antes do `login:`.
-5. Entrar com o usuário do `tp8.env` (`aluno`).
-6. Rodar `tp8-evidencias`, que grava em `~/evidencias-tp8.txt` e mostra na tela.
+5. Entrar com o usuário do `tp.env` (`aluno`).
+6. Rodar `tp-evidencias`, que grava em `~/evidencias-tp.txt` e mostra na tela.
 7. Anotar o IP da placa e abrir `http://IP_DA_RASPBERRY:5000` no navegador do notebook.
 8. `reboot`. Repetir os passos 5 a 7 mais duas vezes, **sem rodar nenhum comando Docker à mão**.
    O arquivo de evidências acumula as execuções.
@@ -45,12 +45,12 @@ O objetivo dos três ciclos é demonstrar que o serviço e o container voltam so
 | `docker images` | a imagem foi carregada do tar |
 | `docker ps` | o container está em execução |
 | `docker network ls` | a rede `bridge` (docker0) existe |
-| `docker inspect flask-tp8` | IP interno do container e a publicação da porta |
+| `docker inspect flask-tp` | IP interno do container e a publicação da porta |
 | `curl http://127.0.0.1:5000` | a aplicação responde na própria placa |
-| `sha256sum /opt/docker/flask-tp8.tar` | o tar embarcado é o mesmo que foi entregue |
+| `sha256sum /opt/docker/flask-tp.tar` | o tar embarcado é o mesmo que foi entregue |
 
-O `/usr/bin/tp8-evidencias` automatiza a lista inteira: basta logar e digitar o nome dele. A saída
-vai para a tela e é acrescentada a `~/evidencias-tp8.txt`, de modo que os três boots ficam no mesmo
+O `/usr/bin/tp-evidencias` automatiza a lista inteira: basta logar e digitar o nome dele. A saída
+vai para a tela e é acrescentada a `~/evidencias-tp.txt`, de modo que os três boots ficam no mesmo
 arquivo, cada um com o seu `boot_id` e o seu uptime no cabeçalho.
 
 ## Evidências a coletar
@@ -63,14 +63,14 @@ As dez evidências exigidas, e onde cada uma vai:
 | `evidence/login/02-ip-raspberry.png` | saída de `hostname`, `whoami` e `ip addr show eth0` |
 | `evidence/docker/03-docker-running.png` | `docker version` e `docker info` |
 | `evidence/docker/04-container-running.png` | `docker images` e `docker ps` |
-| `evidence/network/05-docker-network.png` | `docker network ls` e `docker inspect flask-tp8` |
+| `evidence/network/05-docker-network.png` | `docker network ls` e `docker inspect flask-tp` |
 | `evidence/network/05-curl-local.png` | `curl http://127.0.0.1:5000` |
 | `evidence/web/06-acesso-notebook.png` | navegador do notebook exibindo a frase |
-| `evidence/evidencias-tp8.txt` | saída do `tp8-evidencias` nos três boots |
-| `evidence/hashes.txt` | SHA-256 do `flask-tp8.tar` e do `sdcard.img` |
+| `evidence/evidencias-tp.txt` | saída do `tp-evidencias` nos três boots |
+| `evidence/hashes.txt` | SHA-256 do `flask-tp.tar` e do `sdcard.img` |
 
-Para tirar o `evidencias-tp8.txt` da placa: desligar, pôr o microSD no PC e copiar
-`/home/aluno/evidencias-tp8.txt` da segunda partição.
+Para tirar o `evidencias-tp.txt` da placa: desligar, pôr o microSD no PC e copiar
+`/home/aluno/evidencias-tp.txt` da segunda partição.
 
 ## Diagnóstico por sintoma
 
@@ -82,5 +82,5 @@ Para tirar o `evidencias-tp8.txt` da placa: desligar, pôr o microSD no PC e cop
 | `dockerd` não inicia | recurso de kernel faltando | `docker info`, `evidence/build/kernel-check-config.txt` |
 | `exec format error` | imagem do container em amd64 | `docker image inspect`; reconstruir com `--platform linux/arm64` |
 | `curl` funciona na placa, mas não de fora | Flask em `127.0.0.1` ou porta não publicada | `app.py`, `docker ps` |
-| Container não volta após reboot | `S99flask-tp8` sem `+x` ou sem `docker start` | `ls -l /etc/init.d/`, `docker ps -a` |
+| Container não volta após reboot | `S99flask-tp` sem `+x` ou sem `docker start` | `ls -l /etc/init.d/`, `docker ps -a` |
 | Primeiro boot parece travado | `docker load` em andamento | esperar 1 a 2 minutos |

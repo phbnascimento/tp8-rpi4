@@ -46,7 +46,7 @@ container viaja dentro do cartão.
 | Kernel | Raspberry Pi Linux (`bcm2711_defconfig`) + `linux-docker.fragment` |
 | Init | BusyBox init (SysV) |
 | Docker | docker-engine 28.5.2 + docker-cli 28.5.2 (pacotes Buildroot) |
-| Container | `flask-tp8:1.0` · `linux/arm64` · base `python:3.12.15-slim-bookworm` |
+| Container | `flask-tp:1.0` · `linux/arm64` · base `python:3.12.15-slim-bookworm` |
 | Aplicação | Flask 3.1.3 sobre Python 3.12 |
 | Rootfs | ext4, 1024 MB |
 
@@ -77,7 +77,7 @@ A sequência de boot está em [docs/imagens/02-boot.png](docs/imagens/02-boot.pn
 ## Estrutura do repositório
 
 ```
-tp8.env                                 parâmetros do grupo (hostname, usuário, senhas, integrantes)
+tp.env                                 parâmetros do grupo (hostname, usuário, senhas, integrantes)
 VERSION                                 identificação da versão entregue (gerado)
 README.md                               este documento
 docs/                                   documentação técnica e diagramas
@@ -86,26 +86,26 @@ evidence/                               evidências da validação
 ├── login/ docker/ network/ web/        capturas da Raspberry e do navegador
 ├── build/                              conferências feitas pelos scripts no host
 └── hashes.txt                          SHA-256 dos artefatos entregues
-br2-external/                           árvore BR2_EXTERNAL (name: TP8)
+br2-external/                           árvore BR2_EXTERNAL (name: TP)
 ├── external.desc · Config.in · external.mk
-├── configs/tp8_rpi4_defconfig          configuração Buildroot do TP (canônica)
-└── board/tp8/rpi4/
+├── configs/tp_rpi4_defconfig          configuração Buildroot do TP (canônica)
+└── board/tp/rpi4/
     ├── buildroot.fragment              opções do TP sobre a defconfig da Pi
-    ├── identidade.fragment             hostname e senha de root (gerado do tp8.env)
+    ├── identidade.fragment             hostname e senha de root (gerado do tp.env)
     ├── linux-docker.fragment           opções de kernel para containers
-    ├── users_table.txt                 usuário do projeto (gerado do tp8.env)
+    ├── users_table.txt                 usuário do projeto (gerado do tp.env)
     └── rootfs-overlay/
         ├── etc/issue                   banner exibido antes do login
-        ├── etc/init.d/S99flask-tp8     sobe o container no boot
+        ├── etc/init.d/S99flask-tp     sobe o container no boot
         ├── etc/network/interfaces      eth0 por DHCP
-        ├── opt/docker/                 recebe o flask-tp8.tar (fora do Git)
-        └── usr/bin/tp8-evidencias      coleta as evidências na própria Pi
+        ├── opt/docker/                 recebe o flask-tp.tar (fora do Git)
+        └── usr/bin/tp-evidencias      coleta as evidências na própria Pi
 flask-app/                              aplicação e Dockerfile
 scripts/                                automação do build (00 a 05 + lib.sh)
 ```
 
 A organização difere do esqueleto sugerido no enunciado em dois pontos, ambos permitidos pela
-cláusula de adaptação: o board fica em `board/tp8/rpi4/` e o overlay chama-se `rootfs-overlay/`,
+cláusula de adaptação: o board fica em `board/tp/rpi4/` e o overlay chama-se `rootfs-overlay/`,
 que são os caminhos usados pelo guia da Aula 10; e os scripts são seis em vez de três, um por
 etapa do processo.
 
@@ -114,7 +114,7 @@ etapa do processo.
 | Fora do Git | Motivo |
 |---|---|
 | `buildroot/`, `output-rpi4/`, `*.img` | artefatos de build, reconstruídos pelos scripts |
-| `flask-tp8.tar` (48 MB) | artefato de build; o que o define (`Dockerfile`, `app.py`, `requirements.txt`) está versionado |
+| `flask-tp.tar` (48 MB) | artefato de build; o que o define (`Dockerfile`, `app.py`, `requirements.txt`) está versionado |
 
 O SHA-256 de ambos os artefatos fica em [evidence/hashes.txt](evidence/hashes.txt). Build de Docker
 não é reprodutível byte a byte, então o hash identifica o artefato **entregue**, não valida uma
@@ -122,14 +122,14 @@ reconstrução.
 
 ## Procedimento de configuração
 
-Todo parâmetro do grupo está no `tp8.env`:
+Todo parâmetro do grupo está no `tp.env`:
 
 ```sh
 GRUPO="G03"
 INTEGRANTES=( "Pedro Cretella - RA 226013" ... )
-HOSTNAME_RPI="rpi4-tp8-g03"
+HOSTNAME_RPI="rpi4-tp-g03"
 USUARIO="aluno"
-SENHA="tp8grupo03"
+SENHA="tpgrupo03"
 ROOT_SENHA="123456"
 BUILDROOT_VERSION="2026.08.1"
 VERSAO_PROJETO="1.0"
@@ -144,8 +144,8 @@ reproduzir o mesmo `.config`.
 ```bash
 ./scripts/00-setup-host.sh        # dependências, Docker, buildx, emulação arm64 (usa sudo)
 ./scripts/01-fetch-buildroot.sh   # Buildroot 2026.08.1 em ./buildroot
-./scripts/02-configure.sh         # gera e salva br2-external/configs/tp8_rpi4_defconfig
-./scripts/03-build-flask-image.sh # imagem arm64 → rootfs-overlay/opt/docker/flask-tp8.tar
+./scripts/02-configure.sh         # gera e salva br2-external/configs/tp_rpi4_defconfig
+./scripts/03-build-flask-image.sh # imagem arm64 → rootfs-overlay/opt/docker/flask-tp.tar
 ./scripts/04-build-image.sh       # make → output-rpi4/images/sdcard.img
 ```
 
@@ -154,7 +154,7 @@ Os scripts `02` e `03` podem rodar em qualquer ordem entre si, mas os dois preci
 
 ```bash
 cd buildroot
-make O=../output-rpi4 BR2_EXTERNAL=../br2-external tp8_rpi4_defconfig
+make O=../output-rpi4 BR2_EXTERNAL=../br2-external tp_rpi4_defconfig
 make O=../output-rpi4 BR2_EXTERNAL=../br2-external -j$(nproc)
 ```
 
@@ -185,13 +185,13 @@ sync
 
 | Usuário | Senha | Grupos | Como nasce |
 |---|---|---|---|
-| `aluno` | `tp8grupo03` | `aluno`, `docker` | `users_table.txt` → `/etc/passwd`, `/etc/shadow` (SHA-256), `/etc/group` |
+| `aluno` | `tpgrupo03` | `aluno`, `docker` | `users_table.txt` → `/etc/passwd`, `/etc/shadow` (SHA-256), `/etc/group` |
 | `root` | `123456` | — | `BR2_TARGET_GENERIC_ROOT_PASSWD` |
 
 Linha da users table:
 
 ```
-aluno -2 aluno -2 =tp8grupo03 /home/aluno /bin/sh docker Aluno_TP8_G03
+aluno -2 aluno -2 =tpgrupo03 /home/aluno /bin/sh docker Aluno_TP_G03
 ```
 
 O `-2` pede UID e GID automáticos na faixa de usuário comum (1000 em diante); o `=` indica senha em
@@ -205,10 +205,10 @@ texto claro, que o `mkusers` converte em hash — aceitável apenas neste TP. Pe
 3. Monitor HDMI e teclado.
 4. Fonte de alimentação **por último**.
 
-Ao ligar, o banner do grupo aparece antes do `login:`. Entre com `aluno` / `tp8grupo03`.
+Ao ligar, o banner do grupo aparece antes do `login:`. Entre com `aluno` / `tpgrupo03`.
 
 > **No primeiro boot, a tela fica parada por 1 a 2 minutos** na mensagem
-> `[TP8] carregando imagem Docker`. É o `docker load` dos 48 MB do cartão, que acontece uma única
+> `[TP] carregando imagem Docker`. É o `docker load` dos 48 MB do cartão, que acontece uma única
 > vez. Não desligue a placa nesse momento. Nos boots seguintes o login aparece normalmente.
 
 ## Como descobrir o IP da Raspberry
@@ -218,23 +218,23 @@ ip addr show eth0
 ```
 
 O endereço aparece na linha `inet`, algo como `192.168.0.42/24`. Alternativas: `ip route`, ou a
-lista de clientes DHCP na interface do roteador. O `tp8-evidencias` imprime a URL pronta ao final.
+lista de clientes DHCP na interface do roteador. O `tp-evidencias` imprime a URL pronta ao final.
 
 ## Como verificar o Docker
 
 ```sh
 docker version     # cliente e daemon respondendo
 docker info        # estado do daemon; avisos de kernel apareceriam aqui
-docker images      # flask-tp8:1.0 deve estar listada
+docker images      # flask-tp:1.0 deve estar listada
 ```
 
 ## Como verificar o container
 
 ```sh
-docker ps                      # flask-tp8 deve estar "Up"
+docker ps                      # flask-tp deve estar "Up"
 docker network ls              # a rede bridge (docker0)
-docker inspect flask-tp8       # IP interno e publicação da porta
-docker logs flask-tp8          # saída do Flask
+docker inspect flask-tp       # IP interno e publicação da porta
+docker logs flask-tp          # saída do Flask
 ```
 
 ## Como acessar a aplicação
@@ -258,16 +258,16 @@ Os dois devem exibir `Helooowww world eng. Computacional!!!!!!!`.
 Após o login, rode na placa:
 
 ```sh
-tp8-evidencias
+tp-evidencias
 ```
 
 Ele coleta `hostname`, `whoami`, `id`, `uname -a`, `/etc/issue`, `ip addr`, `ip route`,
 `docker version`, `docker info`, `docker images`, `docker ps -a`, `docker network ls`,
-`docker inspect flask-tp8`, o SHA-256 do tar e o `curl` local, gravando tudo em
-`~/evidencias-tp8.txt`.
+`docker inspect flask-tp`, o SHA-256 do tar e o `curl` local, gravando tudo em
+`~/evidencias-tp.txt`.
 
 **Teste de reinicialização:** três ciclos de `reboot`, sem executar nenhum comando Docker à mão. A
-cada boot, repetir `tp8-evidencias` e o acesso pelo navegador. O arquivo acumula as execuções. O
+cada boot, repetir `tp-evidencias` e o acesso pelo navegador. O arquivo acumula as execuções. O
 objetivo é comprovar que o serviço e o container voltam sozinhos.
 
 Procedimento completo e tabela de diagnóstico por sintoma em [docs/07-testes.md](docs/07-testes.md).
@@ -308,7 +308,7 @@ que os scripts fazem no host, em [evidence/build/](evidence/build/):
 | Problema | Solução |
 |---|---|
 | O `00-setup-host.sh` era só `apt-get` e morria no host Arch do grupo | passou a detectar `apt-get`/`pacman`; no Arch instala `base-devel` e `docker-buildx` e ativa o `docker.service`, que lá não vem habilitado |
-| A árvore extraída do Buildroot não casava com o caminho esperado pelos scripts | pasta padronizada como `buildroot/` e versão fixada no `tp8.env` |
+| A árvore extraída do Buildroot não casava com o caminho esperado pelos scripts | pasta padronizada como `buildroot/` e versão fixada no `tp.env` |
 
 ### Encontrados em revisão, antes de quebrarem
 
@@ -331,7 +331,7 @@ Todos eram falhas que só apareceriam com a Raspberry na mesa, depois de horas d
 - **Nem todas as saídas de comando foram fotografadas.** As evidências registradas estão em
   `evidence/`; as demais constam dos procedimentos de teste e podem ser reproduzidas com a placa
   ligada.
-- **Senhas em texto claro** no `tp8.env` e, por consequência, no repositório. Aceitável apenas
+- **Senhas em texto claro** no `tp.env` e, por consequência, no repositório. Aceitável apenas
   neste TP, como o próprio enunciado indica; um produto real usaria hash e provisionamento.
 - **A interface `eth0` aparece em dois lugares** — no `BR2_SYSTEM_DHCP` e escrita à mão no
   `interfaces` do overlay. Hoje concordam, mas trocar só um dos dois não teria efeito, porque o
@@ -348,6 +348,13 @@ Todos eram falhas que só apareceriam com a Raspberry na mesa, depois de horas d
 
 ## Versão final entregue
 
+Os valores abaixo descrevem a imagem efetivamente gravada e apresentada, preservada na tag
+`tp8-final`. Os nomes com `tp8` são os daquele momento: a nomenclatura do projeto passou depois
+a ser só `tp`, sem número, para não precisar ser renomeada a cada entrega.
+
+> **Atenção a quem baixar a imagem do Release:** ela é anterior ao rename e só aceita a senha
+> `tp8grupo03`, abaixo. Uma imagem compilada do estado atual do repositório usa `tpgrupo03`.
+
 | Item | Valor |
 |---|---|
 | Versão do projeto | 1.0 |
@@ -356,8 +363,11 @@ Todos eram falhas que só apareceriam com a Raspberry na mesa, depois de horas d
 | Buildroot | 2026.08.1 |
 | Hostname | `rpi4-tp8-g03` |
 | Usuário | `aluno` |
+| Senha | `tp8grupo03` |
 | URL esperada | `http://IP_DA_RASPBERRY:5000` |
 | SHA-256 do `flask-tp8.tar` | `a95183335b829030b610fd6bbd9cef293ebe80f4e2962cceea5fba7eba3e99a6` |
 | SHA-256 do `sdcard.img` | `ba2485d8759abef375e43975ec23b5e63de7f1077d2f83cd276f03c030cfab13` |
 
-O arquivo [VERSION](VERSION) registra os mesmos dados, gerado a partir do `tp8.env`.
+O arquivo [VERSION](VERSION) é gerado a partir do `tp.env` e reflete a configuração **atual** do
+repositório, já com a nomenclatura `tp`. A tabela acima é o registro da entrega do TP 8 e por isso
+guarda os nomes antigos.

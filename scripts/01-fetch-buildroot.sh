@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 01 — Baixa e extrai o Buildroot na versão do tp8.env para ./buildroot
+# 01 — Baixa e extrai o Buildroot na versão do tp.env para ./buildroot
 # (guia Aula 10, Etapa 3.1). A pasta buildroot/ NÃO vai pro Git: ela é
 # reconstruída por este script; a versão fica registrada no README.
 source "$(dirname "$0")/lib.sh"
@@ -23,10 +23,10 @@ if [ -f "$BR_DIR/Makefile" ]; then
     checkpoint "Buildroot $V já está em $BR_DIR — nada a fazer."
     exit 0
   fi
-  die "já existe buildroot/ na versão '$HAVE' (tp8.env pede $V). Apague a pasta buildroot/ e output-rpi4/ e rode de novo."
+  die "já existe buildroot/ na versão '$HAVE' (tp.env pede $V). Apague a pasta buildroot/ e output-rpi4/ e rode de novo."
 fi
 
-cd "$TP8_ROOT"
+cd "$TP_ROOT"
 TARBALL="buildroot-$V.tar.xz"
 info "Baixando $TARBALL de buildroot.org..."
 if wget -c "https://buildroot.org/downloads/$TARBALL"; then

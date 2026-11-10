@@ -46,14 +46,14 @@ primeiro boot.
 
 ## Inicialização automática
 
-O `S60dockerd`, instalado pelo pacote, sobe o daemon. O `S99flask-tp8`, nosso, roda depois:
+O `S60dockerd`, instalado pelo pacote, sobe o daemon. O `S99flask-tp`, nosso, roda depois:
 
 1. espera `docker info` responder (até 60 tentativas, 1 s cada) — evita a corrida entre o
    script e o daemon ainda subindo;
-2. `docker load -i /opt/docker/flask-tp8.tar`, **apenas se** `docker image inspect` não encontrar a
+2. `docker load -i /opt/docker/flask-tp.tar`, **apenas se** `docker image inspect` não encontrar a
    imagem — por isso só acontece no primeiro boot;
 3. `docker start` se o container já existe; senão
-   `docker run -d --name flask-tp8 --restart unless-stopped -p 5000:5000 flask-tp8:1.0`.
+   `docker run -d --name flask-tp --restart unless-stopped -p 5000:5000 flask-tp:1.0`.
 
 O ramo do `docker start` não é redundante. No desligamento o `rcK` chama a ação `stop` do script, e
 um `docker stop` marca o container como parado pelo usuário — estado em que a política

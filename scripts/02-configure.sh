@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# 02 — Gera a configuração do TP8 de forma reproduzível.
-#   1. Aplica o tp8.env: /etc/issue, users_table.txt, hostname e senha do root
+# 02 — Gera a configuração do TP de forma reproduzível.
+#   1. Aplica o tp.env: /etc/issue, users_table.txt, hostname e senha do root
 #   2. Carrega a raspberrypi4_64_defconfig oficial            (Aula 10, 3.2)
 #   3. Mescla buildroot.fragment + identidade.fragment        (= o que se faria no menuconfig, Etapas 5 e 6)
 #   4. Confere se as opções essenciais ficaram ativas
-#   5. Salva br2-external/configs/tp8_rpi4_defconfig        (Aula 10, 10.1)
+#   5. Salva br2-external/configs/tp_rpi4_defconfig        (Aula 10, 10.1)
 #   6. Teste de reprodutibilidade: apaga o .config e recarrega da defconfig salva (Aula 10, 10.2)
-# Rode de novo sempre que mudar o tp8.env ou algum fragment.
+# Rode de novo sempre que mudar o tp.env ou algum fragment.
 source "$(dirname "$0")/lib.sh"
 require_not_root
 load_env
@@ -15,12 +15,12 @@ load_env
 info "Normalizando finais de linha e permissões do overlay e scripts..."
 while IFS= read -r -d '' f; do
   if grep -Iq . "$f" 2>/dev/null && grep -q $'\r' "$f"; then
-    sed -i 's/\r$//' "$f"; warn "CRLF removido de ${f#"$TP8_ROOT"/}"
+    sed -i 's/\r$//' "$f"; warn "CRLF removido de ${f#"$TP_ROOT"/}"
   fi
-done < <(find "$EXT_DIR" "$FLASK_DIR" "$TP8_ROOT/scripts" -type f ! -name '*.tar' -print0)
-chmod +x "$OVERLAY_DIR/etc/init.d/S99flask-tp8" "$OVERLAY_DIR/usr/bin/tp8-evidencias" "$TP8_ROOT"/scripts/*.sh
+done < <(find "$EXT_DIR" "$FLASK_DIR" "$TP_ROOT/scripts" -type f ! -name '*.tar' -print0)
+chmod +x "$OVERLAY_DIR/etc/init.d/S99flask-tp" "$OVERLAY_DIR/usr/bin/tp-evidencias" "$TP_ROOT"/scripts/*.sh
 
-# --- 1. Identidade do sistema a partir do tp8.env -------------------------
+# --- 1. Identidade do sistema a partir do tp.env -------------------------
 info "Gerando /etc/issue (banner antes do login)..."
 {
   echo "================================================"
@@ -35,12 +35,12 @@ info "Gerando /etc/issue (banner antes do login)..."
 info "Gerando users_table.txt (usuário '$USUARIO' no grupo docker)..."
 # formato: usuario uid grupo gid senha home shell grupos-extras comentario
 #  -2 = UID/GID automático na faixa de usuário comum (1000+); '=' = senha em texto claro
-echo "$USUARIO -2 $USUARIO -2 =$SENHA /home/$USUARIO /bin/sh docker Aluno_TP8_$GRUPO" \
+echo "$USUARIO -2 $USUARIO -2 =$SENHA /home/$USUARIO /bin/sh docker Aluno_TP_$GRUPO" \
   > "$BOARD_DIR/users_table.txt"
 
 info "Gerando identidade.fragment (hostname e senha do root)..."
 {
-  echo "# Gerado por scripts/02-configure.sh a partir do tp8.env"
+  echo "# Gerado por scripts/02-configure.sh a partir do tp.env"
   echo "BR2_TARGET_GENERIC_HOSTNAME=\"$HOSTNAME_RPI\""
   echo "BR2_TARGET_GENERIC_ISSUE=\"TP Aula 8 - Sistemas Embarcados - UNISANTA - Grupo $GRUPO\""
   if [ -n "$ROOT_SENHA" ]; then
@@ -53,7 +53,7 @@ info "Carregando raspberrypi4_64_defconfig..."
 br_make raspberrypi4_64_defconfig
 
 # --- 3. Mescla as opções do TP --------------------------------------------
-info "Mesclando fragments do TP8..."
+info "Mesclando fragments do TP..."
 if ! LOG="$(KCONFIG_CONFIG="$OUT_DIR/.config" "$BR_DIR/support/kconfig/merge_config.sh" -m -O "$OUT_DIR" \
       "$OUT_DIR/.config" "$BOARD_DIR/buildroot.fragment" "$BOARD_DIR/identidade.fragment" 2>&1)"; then
   echo "$LOG"; die "merge_config.sh falhou"
@@ -79,12 +79,12 @@ check 'BR2_PACKAGE_CGROUPFS_V2_MOUNT=y'
 check 'BR2_PACKAGE_LIBCURL_CURL=y'
 check 'BR2_TARGET_ROOTFS_EXT2_SIZE="1024M"'
 check "BR2_TARGET_GENERIC_HOSTNAME=\"$HOSTNAME_RPI\""
-# shellcheck disable=SC2016  # $(BR2_EXTERNAL_TP8_PATH) é literal do Buildroot, não do shell
-check 'BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/rootfs-overlay"'
+# shellcheck disable=SC2016  # $(BR2_EXTERNAL_TP_PATH) é literal do Buildroot, não do shell
+check 'BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/rootfs-overlay"'
 # shellcheck disable=SC2016
-check 'BR2_ROOTFS_USERS_TABLES="$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/users_table.txt"'
+check 'BR2_ROOTFS_USERS_TABLES="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/users_table.txt"'
 # shellcheck disable=SC2016
-check 'BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/linux-docker.fragment"'
+check 'BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/linux-docker.fragment"'
 
 # --- 5. Salva a defconfig do TP -------------------------------------------
 br_make BR2_DEFCONFIG="$EXT_DIR/configs/$DEFCONFIG_NAME" savedefconfig
@@ -108,7 +108,7 @@ cp "$EXT_DIR/configs/$DEFCONFIG_NAME" "$BRCFG_DIR/$DEFCONFIG_NAME"
   echo "usuario: $USUARIO"
   echo "container: $IMAGE_REF"
   echo "porta: 5000"
-} > "$TP8_ROOT/VERSION"
+} > "$TP_ROOT/VERSION"
 info "buildroot-config/$DEFCONFIG_NAME e VERSION atualizados"
 
 # --- 6. Teste de reprodutibilidade (Aula 10, 10.2) ------------------------

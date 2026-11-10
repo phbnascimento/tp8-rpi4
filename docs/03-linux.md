@@ -7,7 +7,7 @@ do `bcm2711_defconfig`.
 ```
 Configuração: Kernel → Additional configuration fragment files
 Símbolo:      BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES=
-              "$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/linux-docker.fragment"
+              "$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/linux-docker.fragment"
 Motivo:       garantir namespaces, cgroups, veth, bridge, netfilter/NAT e
               overlayfs, que o Docker exige do kernel hospedeiro.
 Dependências: o fragment é mesclado sobre o defconfig do kernel pelo próprio

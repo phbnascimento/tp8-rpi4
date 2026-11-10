@@ -1,0 +1,1 @@
+aluno -2 aluno -2 =tpgrupo03 /home/aluno /bin/sh docker Aluno_TP_G03

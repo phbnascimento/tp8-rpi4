@@ -17,7 +17,7 @@
   <!-- Raspberry -->
   <rect x="300" y="80" width="570" height="440" rx="8" fill="#fbfbfb" stroke="#1a1a1a" stroke-width="2"/>
   <text x="585" y="104" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a1a1a">Raspberry Pi 4 Model B — aarch64</text>
-  <text x="585" y="121" text-anchor="middle" font-size="11" fill="#666">hostname rpi4-tp8-g03 · eth0 por DHCP</text>
+  <text x="585" y="121" text-anchor="middle" font-size="11" fill="#666">hostname rpi4-tp-g03 · eth0 por DHCP</text>
 
   <!-- Linux -->
   <rect x="320" y="136" width="530" height="66" rx="5" fill="#eaf3ea" stroke="#3d6b3d" stroke-width="1.5"/>
@@ -38,10 +38,10 @@
 
   <!-- container -->
   <rect x="340" y="352" width="490" height="76" rx="5" fill="#f3eef7" stroke="#6b4a82" stroke-width="1.5"/>
-  <text x="355" y="374" font-size="13" font-weight="bold" fill="#1a1a1a">Container flask-tp8 (linux/arm64)</text>
+  <text x="355" y="374" font-size="13" font-weight="bold" fill="#1a1a1a">Container flask-tp (linux/arm64)</text>
   <text x="355" y="393" font-size="11" fill="#444">IP interno 172.17.0.x · porta 5000 do container</text>
   <text x="355" y="409" font-size="11" fill="#444">docker run -d --restart unless-stopped -p 5000:5000</text>
-  <text x="355" y="423" font-size="11" fill="#444">carregado de /opt/docker/flask-tp8.tar no 1º boot</text>
+  <text x="355" y="423" font-size="11" fill="#444">carregado de /opt/docker/flask-tp.tar no 1º boot</text>
 
   <!-- flask -->
   <rect x="360" y="442" width="450" height="58" rx="5" fill="#ffffff" stroke="#999" stroke-width="1.2"/>

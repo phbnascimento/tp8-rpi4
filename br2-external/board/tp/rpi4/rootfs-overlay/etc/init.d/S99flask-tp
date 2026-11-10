@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# S99flask-tp8 — sobe o container Flask do TP8 no boot.
+# S99flask-tp — sobe o container Flask do TP no boot.
 #
 # Quem executa: o init do BusyBox (/etc/init.d/rcS) roda os scripts Sxx em
 # ordem alfabética com "start". S60dockerd (instalado pelo pacote
@@ -10,33 +10,33 @@
 #
 # Baseado no guia da Aula 10 (Etapa 9.2).
 
-IMAGE="flask-tp8:1.0"
-CONTAINER="flask-tp8"
-TAR="/opt/docker/flask-tp8.tar"
+IMAGE="flask-tp:1.0"
+CONTAINER="flask-tp"
+TAR="/opt/docker/flask-tp.tar"
 TIMEOUT=60
 
 start_app() {
-	echo "[TP8] aguardando Docker..."
+	echo "[TP] aguardando Docker..."
 	i=0
 	while ! docker info >/dev/null 2>&1; do
 		i=$((i + 1))
 		if [ "$i" -ge "$TIMEOUT" ]; then
-			echo "[TP8] Docker não ficou disponível em ${TIMEOUT}s."
+			echo "[TP] Docker não ficou disponível em ${TIMEOUT}s."
 			return 1
 		fi
 		sleep 1
 	done
 
 	if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-		echo "[TP8] carregando imagem Docker de $TAR (1º boot, pode demorar)..."
+		echo "[TP] carregando imagem Docker de $TAR (1º boot, pode demorar)..."
 		docker load -i "$TAR" || return 1
 	fi
 
 	if docker container inspect "$CONTAINER" >/dev/null 2>&1; then
-		echo "[TP8] iniciando container existente $CONTAINER"
+		echo "[TP] iniciando container existente $CONTAINER"
 		docker start "$CONTAINER" >/dev/null
 	else
-		echo "[TP8] criando container $CONTAINER na porta 5000"
+		echo "[TP] criando container $CONTAINER na porta 5000"
 		docker run -d \
 			--name "$CONTAINER" \
 			--restart unless-stopped \

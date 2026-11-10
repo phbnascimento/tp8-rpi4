@@ -3,8 +3,8 @@ versao: 1.0
 grupo: G03
 buildroot: 2026.08.1
 placa: Raspberry Pi 4 Model B (aarch64)
-defconfig: br2-external/configs/tp8_rpi4_defconfig
-hostname: rpi4-tp8-g03
+defconfig: br2-external/configs/tp_rpi4_defconfig
+hostname: rpi4-tp-g03
 usuario: aluno
-container: flask-tp8:1.0
+container: flask-tp:1.0
 porta: 5000

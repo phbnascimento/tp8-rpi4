@@ -2,17 +2,17 @@
 
 A configuração nasce da `raspberrypi4_64_defconfig` oficial e recebe por cima os fragments do
 projeto, mesclados por `support/kconfig/merge_config.sh` seguido de `olddefconfig`. O resultado é
-salvo com `savedefconfig` em `br2-external/configs/tp8_rpi4_defconfig`.
+salvo com `savedefconfig` em `br2-external/configs/tp_rpi4_defconfig`.
 
 ## Árvore BR2_EXTERNAL
 
 ```
 Configuração: make BR2_EXTERNAL=../br2-external
-Símbolo:      arquivo br2-external/external.desc, name: TP8
+Símbolo:      arquivo br2-external/external.desc, name: TP
 Motivo:       separar o que é do produto (defconfig, overlay, users table,
               fragments) da árvore do Buildroot, que é baixada e descartável.
 Dependências: external.desc, Config.in e external.mk devem existir; o caminho
-              vira a variável $(BR2_EXTERNAL_TP8_PATH), usada nas opções abaixo.
+              vira a variável $(BR2_EXTERNAL_TP_PATH), usada nas opções abaixo.
 Impacto:      permite atualizar ou trocar o Buildroot sem perder customização,
               e mantém no Git apenas o que o grupo escreveu.
 ```
@@ -21,9 +21,9 @@ Impacto:      permite atualizar ou trocar o Buildroot sem perder customização,
 
 ```
 Configuração: System configuration → System hostname
-Símbolo:      BR2_TARGET_GENERIC_HOSTNAME="rpi4-tp8-g03"
+Símbolo:      BR2_TARGET_GENERIC_HOSTNAME="rpi4-tp-g03"
 Motivo:       identificar a placa do grupo na rede e no prompt.
-Dependências: nenhuma. O valor é gerado do tp8.env pelo scripts/02-configure.sh.
+Dependências: nenhuma. O valor é gerado do tp.env pelo scripts/02-configure.sh.
 Impacto:      grava /etc/hostname; o init aplica com "hostname -F" no sysinit.
 ```
 
@@ -32,7 +32,7 @@ Impacto:      grava /etc/hostname; o init aplica com "hostname -F" no sysinit.
 ```
 Configuração: System configuration → Path to the users tables
 Símbolo:      BR2_ROOTFS_USERS_TABLES=
-              "$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/users_table.txt"
+              "$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/users_table.txt"
 Motivo:       criar o usuário durante o build, sem nenhum passo manual depois
               do boot — exigência explícita do TP.
 Dependências: o utilitário mkusers do Buildroot, executado no target-finalize.
@@ -43,7 +43,7 @@ Impacto:      gera as linhas de /etc/passwd, /etc/group e o hash em /etc/shadow.
 A linha usada é:
 
 ```
-aluno -2 aluno -2 =tp8grupo03 /home/aluno /bin/sh docker Aluno_TP8_G03
+aluno -2 aluno -2 =tpgrupo03 /home/aluno /bin/sh docker Aluno_TP_G03
 ```
 
 Os dois `-2` pedem UID e GID automáticos na faixa de usuário comum, de 1000 em diante — o valor
@@ -54,12 +54,12 @@ que o enunciado espera. A imagem gerada confirma `aluno:x:1000:1000`.
 ```
 Configuração: System configuration → Root filesystem overlay directories
 Símbolo:      BR2_ROOTFS_OVERLAY=
-              "$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/rootfs-overlay"
+              "$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/rootfs-overlay"
 Motivo:       colocar arquivos no sistema de forma versionada e reproduzível.
 Dependências: a árvore é copiada no fim do build, DEPOIS da instalação dos
               pacotes — então o overlay sobrescreve arquivos gerados.
-Impacto:      entrega /etc/issue, /etc/init.d/S99flask-tp8, /etc/network/interfaces,
-              /usr/bin/tp8-evidencias e /opt/docker/flask-tp8.tar.
+Impacto:      entrega /etc/issue, /etc/init.d/S99flask-tp, /etc/network/interfaces,
+              /usr/bin/tp-evidencias e /opt/docker/flask-tp.tar.
 ```
 
 A ordem importa: como o overlay é copiado por último, ele tem precedência sobre o

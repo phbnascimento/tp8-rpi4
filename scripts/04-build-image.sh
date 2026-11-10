@@ -8,8 +8,8 @@ require_not_root
 
 [ -f "$OVERLAY_DIR/opt/docker/$IMAGE_TAR_NAME" ] \
   || die "falta rootfs-overlay/opt/docker/$IMAGE_TAR_NAME — rode ./scripts/03-build-flask-image.sh primeiro"
-[ -x "$OVERLAY_DIR/etc/init.d/S99flask-tp8" ] \
-  || die "S99flask-tp8 sem permissão de execução — rode ./scripts/02-configure.sh"
+[ -x "$OVERLAY_DIR/etc/init.d/S99flask-tp" ] \
+  || die "S99flask-tp sem permissão de execução — rode ./scripts/02-configure.sh"
 
 if [ ! -f "$OUT_DIR/.config" ]; then
   [ -f "$EXT_DIR/configs/$DEFCONFIG_NAME" ] || die "sem .config e sem defconfig — rode ./scripts/02-configure.sh"
@@ -33,10 +33,29 @@ ls -lh "$OUT_DIR/images/"
 
 # Confere se o que importa entrou no rootfs final
 T="$OUT_DIR/target"
-for f in etc/issue etc/network/interfaces etc/init.d/S60dockerd etc/init.d/S99flask-tp8 \
-         "opt/docker/$IMAGE_TAR_NAME" usr/bin/docker usr/bin/dockerd usr/bin/curl usr/bin/tp8-evidencias; do
+for f in etc/issue etc/network/interfaces etc/init.d/S60dockerd etc/init.d/S99flask-tp \
+         "opt/docker/$IMAGE_TAR_NAME" usr/bin/docker usr/bin/dockerd usr/bin/curl usr/bin/tp-evidencias; do
   [ -e "$T/$f" ] || die "não encontrei /$f no rootfs final (output-rpi4/target)"
 done
+# O Buildroot copia o overlay POR CIMA de target/ e nunca remove o que ficou de
+# uma build anterior. Depois do rename tp8 -> tp, um S99flask-tp8 sobrevivente
+# subiria um segundo container disputando a porta 5000. Falha cedo em vez de
+# gerar uma imagem com os dois.
+# Só nossos diretórios: em lib/modules existem módulos do kernel cujo nome contém
+# a mesma sequência (atp870u, ntp8835), que dariam falso positivo.
+STALE="$(find "$T/etc/init.d" "$T/usr/bin" "$T/opt/docker" -name '*tp8*' 2>/dev/null)"
+[ -z "$STALE" ] \
+  || die "sobraram arquivos da nomenclatura antiga em target/:
+$STALE
+Apague-os (ou rode 'make -C buildroot O=../output-rpi4 clean') e gere a imagem de novo."
+# O overlay guarda o tar da imagem Docker. Renomear o arquivo não muda a RepoTag
+# gravada dentro dele: se divergir do IMAGE_REF, o S99 carrega uma tag e tenta
+# rodar outra, e o container não sobe no boot.
+if command -v tar >/dev/null 2>&1; then
+  tar -xOf "$T/opt/docker/$IMAGE_TAR_NAME" manifest.json 2>/dev/null \
+    | grep -q "\"$IMAGE_REF\"" \
+    || die "$IMAGE_TAR_NAME não contém a imagem $IMAGE_REF — rode ./scripts/03-build-flask-image.sh"
+fi
 load_env
 # A espera pelo link da eth0 precisa sobreviver à cópia do overlay: sem ela a
 # interface pode ficar sem IP no boot.
@@ -50,7 +69,7 @@ if [ -x "$DEBUGFS" ] && [ -f "$ROOTFS_EXT4" ]; then
   IMG_GROUP="$("$DEBUGFS" -R 'cat /etc/group' "$ROOTFS_EXT4" 2>/dev/null)"
   echo "$IMG_PASSWD" | grep -q "^$USUARIO:" \
     || die "usuário $USUARIO não está em /etc/passwd dentro de images/rootfs.ext4
-  (confira board/tp8/rpi4/users_table.txt e rode ./scripts/02-configure.sh)"
+  (confira board/tp/rpi4/users_table.txt e rode ./scripts/02-configure.sh)"
   echo "$IMG_GROUP" | grep -q "^docker:.*$USUARIO" \
     || die "usuário $USUARIO não está no grupo docker dentro de images/rootfs.ext4"
   info "usuário $USUARIO e grupo docker conferidos DENTRO do rootfs.ext4 ✔"
@@ -99,12 +118,12 @@ if [ -n "$ROOTFS_MB" ]; then
   info "rootfs: ${ROOTFS_MB}M total, ${USED_MB}M ocupados, ${FREE_MB}M livres (o docker load vai querer ~${TAR_MB}M)"
   if [ "$FREE_MB" -lt "$TAR_MB" ]; then
     warn "pouco espaço livre no rootfs para o 'docker load' do 1º boot.
-  Aumente BR2_TARGET_ROOTFS_EXT2_SIZE em br2-external/board/tp8/rpi4/buildroot.fragment
+  Aumente BR2_TARGET_ROOTFS_EXT2_SIZE em br2-external/board/tp/rpi4/buildroot.fragment
   (ex.: 2048M), rode ./scripts/02-configure.sh e este script de novo."
   fi
 fi
 
 record_hash "$IMG" "sdcard.img"
 checkpoint "imagem pronta em ${MIN} min: output-rpi4/images/sdcard.img
-  Rootfs conferido: banner, rede, S60dockerd, S99flask-tp8, flask-tp8.tar, docker, curl, usuário $USUARIO.
+  Rootfs conferido: banner, rede, S60dockerd, S99flask-tp, flask-tp.tar, docker, curl, usuário $USUARIO.
   Próximo: ./scripts/05-flash-sd.sh"

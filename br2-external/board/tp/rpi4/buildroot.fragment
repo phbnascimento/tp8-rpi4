@@ -1,10 +1,10 @@
 # =====================================================================
-#  Opções Buildroot do TP8 aplicadas POR CIMA da raspberrypi4_64_defconfig
+#  Opções Buildroot do TP aplicadas POR CIMA da raspberrypi4_64_defconfig
 # =====================================================================
 #  Quem aplica: scripts/02-configure.sh (merge_config + olddefconfig)
-#  Resultado versionado: br2-external/configs/tp8_rpi4_defconfig
+#  Resultado versionado: br2-external/configs/tp_rpi4_defconfig
 #
-#  Hostname e senha do root NÃO ficam aqui: vêm do tp8.env e são gerados
+#  Hostname e senha do root NÃO ficam aqui: vêm do tp.env e são gerados
 #  em identidade.fragment pelo próprio 02-configure.sh.
 #
 #  Onde cada opção aparece no "make menuconfig" está comentado ao lado.
@@ -12,9 +12,9 @@
 
 # --- System configuration ---------------------------------------------
 # System configuration → Root filesystem overlay directories
-BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/rootfs-overlay"
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/rootfs-overlay"
 # System configuration → Path to the users tables
-BR2_ROOTFS_USERS_TABLES="$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/users_table.txt"
+BR2_ROOTFS_USERS_TABLES="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/users_table.txt"
 # System configuration → Network interface to configure through DHCP
 # Já vem eth0 na defconfig da Pi. É esta opção que gera /etc/network/interfaces
 # (com "wait-delay 15", que espera o link subir antes do udhcpc). O checklist do
@@ -35,10 +35,10 @@ BR2_PACKAGE_LIBCURL=y
 BR2_PACKAGE_LIBCURL_CURL=y
 
 # --- Filesystem images → ext2/3/4 root filesystem → exact size --------
-# A defconfig da Pi usa 120M: não cabe Docker + flask-tp8.tar + camadas
+# A defconfig da Pi usa 120M: não cabe Docker + flask-tp.tar + camadas
 # extraídas em /var/lib/docker. Guia da Aula 9: 1024M (2048M se faltar).
 BR2_TARGET_ROOTFS_EXT2_SIZE="1024M"
 
 # --- Kernel → Additional configuration fragment files ------------------
 # Garante namespaces, cgroups, veth, bridge, netfilter/NAT e overlayfs.
-BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_TP8_PATH)/board/tp8/rpi4/linux-docker.fragment"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/linux-docker.fragment"

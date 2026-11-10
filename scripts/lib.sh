@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034  # variáveis usadas pelos scripts que fazem source desta lib
-# Funções e caminhos comuns a todos os scripts do TP8.
+# Funções e caminhos comuns a todos os scripts do TP.
 # Uso: source "$(dirname "$0")/lib.sh"
 
 set -euo pipefail
 
-TP8_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BR_DIR="$TP8_ROOT/buildroot"
-OUT_DIR="$TP8_ROOT/output-rpi4"
-EXT_DIR="$TP8_ROOT/br2-external"
-BOARD_DIR="$EXT_DIR/board/tp8/rpi4"
+TP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BR_DIR="$TP_ROOT/buildroot"
+OUT_DIR="$TP_ROOT/output-rpi4"
+EXT_DIR="$TP_ROOT/br2-external"
+BOARD_DIR="$EXT_DIR/board/tp/rpi4"
 OVERLAY_DIR="$BOARD_DIR/rootfs-overlay"
-FLASK_DIR="$TP8_ROOT/flask-app"
-EVID_DIR="$TP8_ROOT/evidence"
+FLASK_DIR="$TP_ROOT/flask-app"
+EVID_DIR="$TP_ROOT/evidence"
 EVID_BUILD_DIR="$EVID_DIR/build"
-BRCFG_DIR="$TP8_ROOT/buildroot-config"
-DEFCONFIG_NAME="tp8_rpi4_defconfig"
+BRCFG_DIR="$TP_ROOT/buildroot-config"
+DEFCONFIG_NAME="tp_rpi4_defconfig"
 
-IMAGE_REF="flask-tp8:1.0"
-IMAGE_TAR_NAME="flask-tp8.tar"
+IMAGE_REF="flask-tp:1.0"
+IMAGE_TAR_NAME="flask-tp.tar"
 
 if [ -t 1 ]; then
   C_OK=$'\e[32m'; C_ERR=$'\e[31m'; C_INFO=$'\e[36m'; C_WARN=$'\e[33m'; C_END=$'\e[0m'
@@ -26,15 +26,15 @@ else
   C_OK=""; C_ERR=""; C_INFO=""; C_WARN=""; C_END=""
 fi
 
-info()  { echo "${C_INFO}[TP8]${C_END} $*"; }
-warn()  { echo "${C_WARN}[TP8] ATENÇÃO:${C_END} $*" >&2; }
-die()   { echo "${C_ERR}[TP8] ERRO:${C_END} $*" >&2; exit 1; }
-checkpoint() { echo; echo "${C_OK}[TP8] ✔ CHECKPOINT:${C_END} $*"; echo; }
+info()  { echo "${C_INFO}[TP]${C_END} $*"; }
+warn()  { echo "${C_WARN}[TP] ATENÇÃO:${C_END} $*" >&2; }
+die()   { echo "${C_ERR}[TP] ERRO:${C_END} $*" >&2; exit 1; }
+checkpoint() { echo; echo "${C_OK}[TP] ✔ CHECKPOINT:${C_END} $*"; echo; }
 
-# Carrega tp8.env removendo CRLF.
+# Carrega tp.env removendo CRLF.
 load_env() {
-  local env_file="$TP8_ROOT/tp8.env"
-  [ -f "$env_file" ] || die "tp8.env não encontrado em $TP8_ROOT"
+  local env_file="$TP_ROOT/tp.env"
+  [ -f "$env_file" ] || die "tp.env não encontrado em $TP_ROOT"
   local tmp
   tmp="$(mktemp)"
   tr -d '\r' < "$env_file" > "$tmp"
@@ -42,11 +42,11 @@ load_env() {
   source "$tmp"
   rm -f "$tmp"
 
-  : "${GRUPO:?defina GRUPO no tp8.env}"
-  : "${HOSTNAME_RPI:?defina HOSTNAME_RPI no tp8.env}"
-  : "${USUARIO:?defina USUARIO no tp8.env}"
-  : "${SENHA:?defina SENHA no tp8.env}"
-  : "${BUILDROOT_VERSION:?defina BUILDROOT_VERSION no tp8.env}"
+  : "${GRUPO:?defina GRUPO no tp.env}"
+  : "${HOSTNAME_RPI:?defina HOSTNAME_RPI no tp.env}"
+  : "${USUARIO:?defina USUARIO no tp.env}"
+  : "${SENHA:?defina SENHA no tp.env}"
+  : "${BUILDROOT_VERSION:?defina BUILDROOT_VERSION no tp.env}"
   ROOT_SENHA="${ROOT_SENHA:-}"
 
   [[ "$HOSTNAME_RPI" =~ ^[a-z0-9][a-z0-9-]*$ ]] \

@@ -20,12 +20,12 @@ cd tp8-rpi4
 # 1. dependências do host, Docker, buildx e emulação ARM64 (usa sudo)
 ./scripts/00-setup-host.sh
 
-# 2. baixa o Buildroot na versão do tp8.env
+# 2. baixa o Buildroot na versão do tp.env
 ./scripts/01-fetch-buildroot.sh
 
-# 3. edite o tp8.env: grupo, integrantes, hostname, usuário e senhas
+# 3. edite o tp.env: grupo, integrantes, hostname, usuário e senhas
 
-# 4. aplica o tp8.env e os fragments, salva e testa a defconfig
+# 4. aplica o tp.env e os fragments, salva e testa a defconfig
 ./scripts/02-configure.sh
 
 # 5. constrói a imagem ARM64 do container e coloca o tar no overlay
@@ -39,7 +39,7 @@ cd tp8-rpi4
 ```
 
 A ordem entre `02` e `03` é indiferente, mas **os dois têm que rodar antes do `04`**: é o `03` que
-deposita o `flask-tp8.tar` no overlay, e é o `04` que o assa dentro da imagem.
+deposita o `flask-tp.tar` no overlay, e é o `04` que o assa dentro da imagem.
 
 ## O que cada script faz
 
@@ -72,7 +72,7 @@ O `04` não termina sem verificar o artefato real, lendo o `images/rootfs.ext4` 
 - `aluno` e grupo `docker` presentes em `/etc/passwd` e `/etc/group`
   (prova em [../evidence/build/usuarios-na-imagem.txt](../evidence/build/usuarios-na-imagem.txt));
 - `wait-delay` presente no `/etc/network/interfaces`;
-- `S60dockerd`, `S99flask-tp8`, `flask-tp8.tar`, `docker` e `curl` no lugar;
+- `S60dockerd`, `S99flask-tp`, `flask-tp.tar`, `docker` e `curl` no lugar;
 - kernel aprovado no `check-config.sh` do Docker
   (saída em [../evidence/build/kernel-check-config.txt](../evidence/build/kernel-check-config.txt));
 - espaço livre suficiente no rootfs para o `docker load` do primeiro boot.
@@ -84,7 +84,7 @@ artefato real, e é nela que o usuário existe.
 
 | Artefato | Caminho | Tamanho |
 |---|---|---|
-| Imagem do container | `br2-external/board/tp8/rpi4/rootfs-overlay/opt/docker/flask-tp8.tar` | 48 MB |
+| Imagem do container | `br2-external/board/tp/rpi4/rootfs-overlay/opt/docker/flask-tp.tar` | 48 MB |
 | Imagem do cartão | `output-rpi4/images/sdcard.img` | 1,1 GB |
 
 Os SHA-256 de ambos ficam em [../evidence/hashes.txt](../evidence/hashes.txt), reescritos a cada

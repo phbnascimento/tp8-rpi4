@@ -26,7 +26,7 @@
     <text x="450" y="400" text-anchor="middle" font-weight="bold" fill="#1a1a1a">S60dockerd — sobe o dockerd</text>
 
     <rect x="300" y="434" width="300" height="104" rx="5" fill="#f3eef7" stroke="#6b4a82" stroke-width="1.6"/>
-    <text x="450" y="454" text-anchor="middle" font-weight="bold" fill="#1a1a1a">S99flask-tp8 (nosso)</text>
+    <text x="450" y="454" text-anchor="middle" font-weight="bold" fill="#1a1a1a">S99flask-tp (nosso)</text>
     <text x="316" y="474" font-size="11" fill="#444">1. espera o "docker info" responder</text>
     <text x="316" y="492" font-size="11" fill="#444">2. docker load do tar embarcado (só no 1º boot)</text>
     <text x="316" y="510" font-size="11" fill="#444">3. docker run -p 5000:5000, ou docker start</text>

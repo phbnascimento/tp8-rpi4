@@ -17,7 +17,7 @@ container recebe um par de interfaces `veth`: uma ponta dentro do container (que
 
 **IP interno do container** — o endereço que o Docker atribui ao container dentro da faixa da
 bridge, tipicamente `172.17.0.2`. Ele só tem significado dentro da Raspberry. Aparece em
-`docker inspect flask-tp8`.
+`docker inspect flask-tp`.
 
 **Porta do container** — a porta onde o processo escuta **dentro** do container: 5000, onde o
 Flask está, por causa de `app.run(host="0.0.0.0", port=5000)`.

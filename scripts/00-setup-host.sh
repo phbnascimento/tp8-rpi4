@@ -98,14 +98,14 @@ if [ "$(uname -m)" != "aarch64" ]; then
 fi
 
 # --- 6. Builder do buildx com linux/arm64 ---------------------------------
-docker buildx create --name tp8builder --use >/dev/null 2>&1 || docker buildx use tp8builder
+docker buildx create --name tpbuilder --use >/dev/null 2>&1 || docker buildx use tpbuilder
 docker buildx inspect --bootstrap | grep -i 'platforms' || true
 docker buildx inspect --bootstrap | grep -q 'linux/arm64' \
   || die "o builder não lista linux/arm64: a emulação ARM64 via binfmt/QEMU não está ativa."
 
-FREE_GB=$(df -BG --output=avail "$TP8_ROOT" | tail -1 | tr -dc '0-9')
+FREE_GB=$(df -BG --output=avail "$TP_ROOT" | tail -1 | tr -dc '0-9')
 if [ "${FREE_GB:-0}" -lt 30 ]; then
-  warn "só ${FREE_GB}G livres em $TP8_ROOT. O build completo usa ~20-30 GB (toolchain, kernel, Go, Docker)."
+  warn "só ${FREE_GB}G livres em $TP_ROOT. O build completo usa ~20-30 GB (toolchain, kernel, Go, Docker)."
 fi
 
 checkpoint "host pronto: dependências OK, docker $(docker --version | awk '{print $3}' | tr -d ,), buildx com linux/arm64, ${FREE_GB}G livres."

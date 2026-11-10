@@ -11,8 +11,8 @@ output-rpi4/
 # Imagem do container (48 MB): é artefato de build, não código-fonte. O script
 # 03 reconstrói uma imagem equivalente a partir do Dockerfile, que fixa as
 # versões; o SHA-256 do arquivo entregue fica em evidence/hashes.txt.
-flask-app/flask-tp8.tar
-br2-external/board/tp8/rpi4/rootfs-overlay/opt/docker/*.tar
+flask-app/flask-tp.tar
+br2-external/board/tp/rpi4/rootfs-overlay/opt/docker/*.tar
 
 # PDFs das aulas (só referência para quem compila)
 docs/aulas/
