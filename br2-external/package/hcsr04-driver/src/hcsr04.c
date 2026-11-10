@@ -9,15 +9,18 @@
  * trig-gpios e echo-gpios do nó compatível com "unisanta,hcsr04". Trocar de
  * pino é editar o overlay, não recompilar o módulo.
  *
- * Esta primeira versão mede por sondagem (polling) do pino ECHO: o caminho
- * mais direto de escrever a medição, ao custo de ocupar a CPU enquanto ela
- * acontece. A versão por interrupção vem em seguida.
+ * A medição é feita por interrupção nas duas bordas do pino ECHO: a borda de
+ * subida marca o instante em que o pulso ultrassônico partiu, a de descida o
+ * instante em que o eco voltou. Entre as duas, o processo que chamou read()
+ * dorme — nenhuma CPU fica ocupada esperando.
  */
 
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/gpio/consumer.h>
+#include <linux/interrupt.h>
+#include <linux/completion.h>
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
@@ -39,18 +42,73 @@
 #define HCSR04_SPEED_DEN	2000000ULL
 
 /*
- * O datasheet do sensor cobre até ~4 m, o que dá cerca de 23 ms de ida e
- * volta. 60 ms deixa folga suficiente e ainda garante que um sensor ausente
- * ou mal ligado devolva erro rápido em vez de travar a leitura.
+ * O datasheet cobre até ~4 m, cerca de 23 ms de ida e volta. Quando não há
+ * obstáculo, porém, o sensor mantém o ECHO alto por cerca de 38 ms antes de
+ * desistir — por isso o prazo tem de ser maior que isso, senão a ausência de
+ * obstáculo apareceria como erro de timeout em vez de leitura. 100 ms deixa
+ * margem confortável e ainda devolve erro rápido se o sensor não responder.
  */
-#define HCSR04_ECHO_TIMEOUT_MS	60
+#define HCSR04_ECHO_TIMEOUT_MS	100
 
 struct hcsr04_dev {
 	struct gpio_desc *trig;
 	struct gpio_desc *echo;
+	int irq;
+
+	/*
+	 * Escritos pelo tratador de interrupção, lidos por read(). A ordenação
+	 * entre os dois é dada pelo par complete()/wait_for_completion(), que
+	 * estabelece a barreira de memória necessária.
+	 */
+	ktime_t rise;			/* instante da borda de subida */
+	bool have_rise;			/* já vimos a subida desta medição */
+	u64 distance_mm;
+
+	struct completion done;
 	struct mutex lock;		/* serializa as medições */
 	struct miscdevice miscdev;
 };
+
+/*
+ * Tratador das duas bordas do ECHO.
+ *
+ * Roda em contexto de interrupção, por isso usa gpiod_get_value() e não a
+ * variante _cansleep: o GPIO do BCM2711 é mapeado em memória e a leitura não
+ * dorme.
+ */
+static irqreturn_t hcsr04_irq(int irq, void *data)
+{
+	struct hcsr04_dev *hdev = data;
+	ktime_t now = ktime_get();
+	s64 delta_ns;
+
+	if (gpiod_get_value(hdev->echo) > 0) {
+		hdev->rise = now;
+		hdev->have_rise = true;
+		return IRQ_HANDLED;
+	}
+
+	/*
+	 * Borda de descida. Se não vimos a subida correspondente, esta é uma
+	 * borda espúria ou resto de uma medição anterior: descartar, senão o
+	 * cálculo usaria um instante de subida velho e devolveria distância
+	 * sem sentido.
+	 */
+	if (!hdev->have_rise)
+		return IRQ_HANDLED;
+
+	hdev->have_rise = false;
+
+	delta_ns = ktime_to_ns(ktime_sub(now, hdev->rise));
+	if (delta_ns <= 0)
+		return IRQ_HANDLED;
+
+	hdev->distance_mm = div_u64((u64)delta_ns * HCSR04_SPEED_NUM,
+				    HCSR04_SPEED_DEN);
+	complete(&hdev->done);
+
+	return IRQ_HANDLED;
+}
 
 /* Pulso de disparo: o HC-SR04 exige TRIG em nível alto por >= 10 us. */
 static void hcsr04_trigger(struct hcsr04_dev *hdev)
@@ -62,49 +120,6 @@ static void hcsr04_trigger(struct hcsr04_dev *hdev)
 	gpiod_set_value_cansleep(hdev->trig, 0);
 }
 
-/*
- * Espera o ECHO atingir o nível desejado, devolvendo o instante em que isso
- * aconteceu. Erro -ETIMEDOUT se o prazo estourar.
- */
-static int hcsr04_wait_level(struct hcsr04_dev *hdev, int want, ktime_t *when)
-{
-	ktime_t deadline = ktime_add_ms(ktime_get(), HCSR04_ECHO_TIMEOUT_MS);
-
-	while (gpiod_get_value(hdev->echo) != want) {
-		if (ktime_after(ktime_get(), deadline))
-			return -ETIMEDOUT;
-		cpu_relax();
-	}
-
-	*when = ktime_get();
-	return 0;
-}
-
-static int hcsr04_measure(struct hcsr04_dev *hdev, u64 *distance_mm)
-{
-	ktime_t rise, fall;
-	s64 delta_ns;
-	int ret;
-
-	hcsr04_trigger(hdev);
-
-	ret = hcsr04_wait_level(hdev, 1, &rise);
-	if (ret)
-		return ret;
-
-	ret = hcsr04_wait_level(hdev, 0, &fall);
-	if (ret)
-		return ret;
-
-	delta_ns = ktime_to_ns(ktime_sub(fall, rise));
-	if (delta_ns <= 0)
-		return -EIO;
-
-	*distance_mm = div_u64((u64)delta_ns * HCSR04_SPEED_NUM,
-			       HCSR04_SPEED_DEN);
-	return 0;
-}
-
 static ssize_t hcsr04_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
@@ -112,7 +127,8 @@ static ssize_t hcsr04_read(struct file *file, char __user *buf,
 	struct hcsr04_dev *hdev = container_of(misc, struct hcsr04_dev, miscdev);
 	char out[32];
 	u64 distance_mm;
-	int len, ret;
+	unsigned long left;
+	int len;
 
 	/* Leitura curta: depois do primeiro read() o arquivo "acaba". */
 	if (*ppos != 0)
@@ -121,12 +137,26 @@ static ssize_t hcsr04_read(struct file *file, char __user *buf,
 	if (mutex_lock_interruptible(&hdev->lock))
 		return -ERESTARTSYS;
 
-	ret = hcsr04_measure(hdev, &distance_mm);
+	/*
+	 * Zerar antes de disparar: se sobrou sinalização de uma medição
+	 * anterior, wait_for_completion_timeout() voltaria na hora com um
+	 * valor velho.
+	 */
+	hdev->have_rise = false;
+	reinit_completion(&hdev->done);
+
+	hcsr04_trigger(hdev);
+
+	left = wait_for_completion_timeout(&hdev->done,
+					   msecs_to_jiffies(HCSR04_ECHO_TIMEOUT_MS));
+	if (!left) {
+		mutex_unlock(&hdev->lock);
+		return -ETIMEDOUT;
+	}
+
+	distance_mm = hdev->distance_mm;
 
 	mutex_unlock(&hdev->lock);
-
-	if (ret)
-		return ret;
 
 	len = scnprintf(out, sizeof(out), "%llu\n", distance_mm);
 
@@ -163,7 +193,28 @@ static int hcsr04_probe(struct platform_device *pdev)
 		return dev_err_probe(&pdev->dev, PTR_ERR(hdev->echo),
 				     "erro ao obter o GPIO do ECHO\n");
 
+	hdev->irq = gpiod_to_irq(hdev->echo);
+	if (hdev->irq < 0)
+		return dev_err_probe(&pdev->dev, hdev->irq,
+				     "o GPIO do ECHO não suporta interrupção\n");
+
+	init_completion(&hdev->done);
 	mutex_init(&hdev->lock);
+
+	/*
+	 * As duas bordas são necessárias: a de subida dá o início da contagem,
+	 * a de descida o fim. Registrado com devm_, portanto liberado junto com
+	 * o dispositivo.
+	 *
+	 * A IRQ é pedida depois de init_completion e mutex_init porque o
+	 * tratador pode disparar assim que ela é registrada.
+	 */
+	ret = devm_request_irq(&pdev->dev, hdev->irq, hcsr04_irq,
+			       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+			       dev_name(&pdev->dev), hdev);
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret,
+				     "erro ao registrar a interrupção do ECHO\n");
 
 	hdev->miscdev.minor  = MISC_DYNAMIC_MINOR;
 	hdev->miscdev.name   = "hcsr04";
@@ -176,7 +227,8 @@ static int hcsr04_probe(struct platform_device *pdev)
 				     "erro ao registrar /dev/hcsr04\n");
 
 	platform_set_drvdata(pdev, hdev);
-	dev_info(&pdev->dev, "HC-SR04 registrado em /dev/hcsr04\n");
+	dev_info(&pdev->dev, "HC-SR04 registrado em /dev/hcsr04 (IRQ %d)\n",
+		 hdev->irq);
 
 	return 0;
 }
