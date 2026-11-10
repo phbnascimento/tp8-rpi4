@@ -4,6 +4,7 @@
 #   - lista os discos com lsblk e pede para você DIGITAR o dispositivo
 #   - recusa o disco onde está o sistema (/) e discos não-removíveis sem confirmação extra
 #   - pede para digitar o nome de novo antes de gravar
+#   - confere, depois de gravar, se o cartão bate byte a byte com a imagem
 # Alternativa gráfica: Raspberry Pi Imager / balenaEtcher → "imagem personalizada" → sdcard.img
 source "$(dirname "$0")/lib.sh"
 require_not_root
@@ -25,6 +26,22 @@ if [ -x "$DEBUGFS" ] && [ -f "$ROOTFS_EXT4" ]; then
 else
   warn "não deu para conferir se o tar do container está na imagem (debugfs/rootfs.ext4 ausentes)."
 fi
+
+# O hash que vai para o commit final tem de ser o do artefato que foi para o
+# cartão. Se o registrado pelo 04 não é o desta imagem, o sdcard.img foi regerado
+# depois — e basta regerar, porque os timestamps do ext4 e da vfat entram na
+# imagem e mudam o hash sem nenhuma mudança de código.
+info "Calculando o SHA-256 da imagem..."
+IMG_HASH="$(sha256sum "$IMG" | awk '{print $1}')"
+REC_HASH="$(awk '$2 == "sdcard.img" { print $1 }' "$EVID_DIR/hashes.txt" 2>/dev/null | tail -1)"
+if [ -n "$REC_HASH" ] && [ "$REC_HASH" != "$IMG_HASH" ]; then
+  die "o SHA-256 registrado em evidence/hashes.txt não é o desta imagem:
+  registrado: $REC_HASH
+  imagem:     $IMG_HASH
+  Rode ./scripts/04-build-image.sh antes de gravar, para que o hash do commit
+  descreva o cartão que você vai apresentar."
+fi
+[ -n "$REC_HASH" ] || warn "evidence/hashes.txt não tem linha de sdcard.img — o 04 não rodou?"
 
 echo
 lsblk -d -o NAME,SIZE,MODEL,TRAN,RM,TYPE | grep -v ' loop\|^loop'
@@ -62,4 +79,41 @@ done
 info "Gravando $(du -h "$IMG" | cut -f1) em /dev/$DEV..."
 sudo dd if="$IMG" of="/dev/$DEV" bs=4M status=progress conv=fsync
 sync
-checkpoint "cartão gravado. Ordem para ligar a Pi: microSD → cabo Ethernet → monitor/teclado → fonte por último."
+
+# Conferência de verdade: lê de volta do cartão exatamente o número de bytes da
+# imagem e compara os hashes. Dois detalhes são essenciais:
+#   iflag=count_bytes — o cartão é maior que a imagem; sem isto a leitura pega
+#     bytes a mais e o hash nunca bateria;
+#   blockdev --flushbufs — descarta o cache de bloco, senão a leitura vem da
+#     memória e a conferência não prova nada sobre o cartão.
+IMG_SIZE="$(stat -c %s "$IMG")"
+info "Lendo $IMG_SIZE bytes de volta do cartão para conferir (demora)..."
+# O set -e abortaria aqui se o flushbufs falhasse, já com o cartão gravado, e sem
+# explicar nada — então a falha vira aviso: a comparação ainda roda, mas pode
+# estar lendo da memória em vez do cartão.
+sudo blockdev --flushbufs "/dev/$DEV" \
+  || warn "não deu para descartar o cache de bloco de /dev/$DEV: a leitura abaixo
+  pode vir da memória, e então ela não prova que o cartão está íntegro."
+CARD_HASH="$(sudo dd if="/dev/$DEV" bs=4M iflag=count_bytes count="$IMG_SIZE" status=none \
+  | sha256sum | awk '{print $1}')"
+[ "$CARD_HASH" = "$IMG_HASH" ] \
+  || die "o conteúdo do cartão não bate com a imagem:
+  imagem: $IMG_HASH
+  cartão: $CARD_HASH
+  A gravação falhou ou o cartão tem defeito. Não apresente este cartão."
+info "cartão confere byte a byte com a imagem ✔"
+
+mkdir -p "$EVID_BUILD_DIR"
+{
+  echo "--- gravação do microSD ---"
+  echo "data: $(date '+%Y-%m-%d %H:%M:%S')"
+  echo "dispositivo: /dev/$DEV (${SIZE_GB} GB)"
+  echo "imagem: ${IMG#"$TP_ROOT"/} ($IMG_SIZE bytes)"
+  echo "SHA-256 da imagem:      $IMG_HASH"
+  echo "SHA-256 lido do cartão: $CARD_HASH"
+  echo "resultado: iguais"
+} > "$EVID_BUILD_DIR/cartao-gravado.txt"
+info "registrado em evidence/build/cartao-gravado.txt"
+
+checkpoint "cartão gravado e conferido ($IMG_HASH).
+  Ordem para ligar a Pi: microSD → cabo Ethernet → monitor/teclado → fonte por último."
