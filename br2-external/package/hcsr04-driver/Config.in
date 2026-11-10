@@ -1,0 +1,13 @@
+config BR2_PACKAGE_HCSR04_DRIVER
+	bool "hcsr04-driver"
+	depends on BR2_LINUX_KERNEL
+	help
+	  Driver Linux do sensor ultrassônico HC-SR04.
+
+	  Expõe /dev/hcsr04, que devolve a distância medida em
+	  milímetros, em texto. Os GPIOs do TRIG e do ECHO não
+	  ficam gravados no código: vêm do Device Tree, pelas
+	  propriedades trig-gpios e echo-gpios.
+
+	  O módulo é compilado contra o kernel do próprio projeto,
+	  pela infraestrutura kernel-module do Buildroot.
