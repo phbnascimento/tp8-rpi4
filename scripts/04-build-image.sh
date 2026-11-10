@@ -59,6 +59,32 @@ if command -v tar >/dev/null 2>&1; then
     || die "$IMAGE_TAR_NAME não contém a imagem $IMAGE_REF — rode ./scripts/03-build-flask-image.sh"
 fi
 
+# O Buildroot copia o overlay por cima de target/ e nunca apaga nada de uma
+# build anterior. Depois do rename flask-tp -> tp-distance, um flask-tp.tar
+# esquecido continuaria na imagem ocupando 48 MB, e o "docker load" do boot
+# carregaria as duas. Exigir o conteúdo exato é mais seguro do que procurar o
+# nome antigo, que daqui a duas entregas ninguém lembra.
+ESPERADO="LEIA-ME.txt $IMAGE_TAR_NAME"
+ENCONTRADO="$(cd "$T/opt/docker" && ls | sort | tr '\n' ' ' | sed 's/ $//')"
+[ "$ENCONTRADO" = "$ESPERADO" ] \
+  || die "/opt/docker na imagem tem \"$ENCONTRADO\", esperado \"$ESPERADO\".
+  Sobrou tar de uma nomenclatura anterior? Apague-o do rootfs-overlay e de
+  output-rpi4/target/opt/docker/ e gere a imagem de novo."
+
+# O script de boot precisa pedir exatamente a imagem que está no tar. São três
+# nomes escritos em arquivos diferentes (lib.sh, o tar e o init), e um rename
+# que esqueça um deles só apareceria no boot, com o container não subindo.
+# O "|| true" não é enfeite: sem ele, quando não houver S99 nenhum, o ls sai
+# com erro, o set -e derruba o script aqui e a mensagem abaixo — que é a útil —
+# nunca chega a ser impressa.
+S99="$(ls "$T"/etc/init.d/S99* 2>/dev/null | head -1 || true)"
+[ -n "$S99" ] || die "não há script S99* em /etc/init.d: nada subiria o container no boot"
+grep -qxF "IMAGE=\"$IMAGE_REF\"" "$S99" \
+  || die "o $(basename "$S99") não usa IMAGE=\"$IMAGE_REF\" (é o que está no $IMAGE_TAR_NAME)"
+grep -qxF "TAR=\"/opt/docker/$IMAGE_TAR_NAME\"" "$S99" \
+  || die "o $(basename "$S99") não aponta para /opt/docker/$IMAGE_TAR_NAME"
+info "container: $IMAGE_REF no tar, no $(basename "$S99") e em /opt/docker, sem sobras ✔"
+
 # --- HC-SR04: driver, overlay e partição de boot -------------------------
 # Nada disto dá para testar sem a placa, então cada peça é conferida aqui.
 
@@ -294,6 +320,6 @@ fi
 
 record_hash "$IMG" "sdcard.img"
 checkpoint "imagem pronta em ${MIN} min: output-rpi4/images/sdcard.img
-  Rootfs conferido: banner, rede, S60dockerd, S99flask-tp, flask-tp.tar, docker, curl, usuário $USUARIO.
+  Rootfs conferido: banner, rede, S60dockerd, o S99 do container, $IMAGE_TAR_NAME, docker, curl, usuário $USUARIO.
   HC-SR04 e Wi-Fi AP conferidos (driver, overlay, firmware, hostapd/dnsmasq).
   Próximo: ./scripts/05-flash-sd.sh"

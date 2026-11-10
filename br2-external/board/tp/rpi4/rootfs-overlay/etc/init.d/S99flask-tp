@@ -2,6 +2,11 @@
 #
 # S99flask-tp — sobe o container Flask do TP no boot.
 #
+# A aplicação deixou de ser o "hello world" do TP 8 e passou a ser o dashboard
+# da distância, então a imagem e o container chamam-se tp-distance. O arquivo
+# ainda se chama S99flask-tp: renomeá-lo para S99tp-app, acrescentar o
+# --device /dev/hcsr04 e publicar na porta 80 são a etapa 10.
+#
 # Quem executa: o init do BusyBox (/etc/init.d/rcS) roda os scripts Sxx em
 # ordem alfabética com "start". S60dockerd (instalado pelo pacote
 # docker-engine) inicia o dockerd antes; este S99 espera o daemon responder,
@@ -10,9 +15,9 @@
 #
 # Baseado no guia da Aula 10 (Etapa 9.2).
 
-IMAGE="flask-tp:1.0"
-CONTAINER="flask-tp"
-TAR="/opt/docker/flask-tp.tar"
+IMAGE="tp-distance:1.0"
+CONTAINER="tp-distance"
+TAR="/opt/docker/tp-distance.tar"
 TIMEOUT=60
 
 start_app() {

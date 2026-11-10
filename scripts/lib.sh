@@ -17,8 +17,8 @@ EVID_BUILD_DIR="$EVID_DIR/build"
 BRCFG_DIR="$TP_ROOT/buildroot-config"
 DEFCONFIG_NAME="tp_rpi4_defconfig"
 
-IMAGE_REF="flask-tp:1.0"
-IMAGE_TAR_NAME="flask-tp.tar"
+IMAGE_REF="tp-distance:1.0"
+IMAGE_TAR_NAME="tp-distance.tar"
 
 if [ -t 1 ]; then
   C_OK=$'\e[32m'; C_ERR=$'\e[31m'; C_INFO=$'\e[36m'; C_WARN=$'\e[33m'; C_END=$'\e[0m'

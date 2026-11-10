@@ -1,5 +1,5 @@
 # Gerado pelos scripts (record_hash, em scripts/lib.sh): descreve o ÚLTIMO build
 # feito neste repositório, não a entrega do TP 8. O registro da entrega está na
 # branch entrega-tp8 e na tag tp8-final.
-b0d44e951501f8dbb33d2bb6dddac7f990119b556b2c01648cc4fb37e46ff9ac  flask-tp.tar
-62f8f0094f4b36f961a34601efebb74d31f40230db27790457f2ead9f1929cc5  sdcard.img
+47fb5940ac922378165923df58ad0c2c98398fcc7ba0bfd73354ccc42f28e424  tp-distance.tar
+c9c70903fb5229403e3fb7c708ca71fe3db22f4d9dc51731a1b4c1859ff5ac22  sdcard.img

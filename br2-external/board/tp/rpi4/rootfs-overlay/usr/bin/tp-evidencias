@@ -34,8 +34,8 @@ run() {
 	run docker images
 	run docker ps -a
 	run docker network ls
-	run docker inspect flask-tp
-	run sha256sum /opt/docker/flask-tp.tar
+	run docker inspect tp-distance
+	run sha256sum /opt/docker/tp-distance.tar
 	run curl -s http://127.0.0.1:5000
 	echo
 } | tee -a "$OUT"

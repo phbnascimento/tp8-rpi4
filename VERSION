@@ -6,5 +6,5 @@ placa: Raspberry Pi 4 Model B (aarch64)
 defconfig: br2-external/configs/tp_rpi4_defconfig
 hostname: rpi4-tp-g03
 usuario: aluno
-container: flask-tp:1.0
+container: tp-distance:1.0
 porta: 5000

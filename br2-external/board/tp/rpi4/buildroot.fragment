@@ -35,7 +35,7 @@ BR2_PACKAGE_LIBCURL=y
 BR2_PACKAGE_LIBCURL_CURL=y
 
 # --- Filesystem images → ext2/3/4 root filesystem → exact size --------
-# A defconfig da Pi usa 120M: não cabe Docker + flask-tp.tar + camadas
+# A defconfig da Pi usa 120M: não cabe Docker + tp-distance.tar + camadas
 # extraídas em /var/lib/docker. Guia da Aula 9: 1024M (2048M se faltar).
 BR2_TARGET_ROOTFS_EXT2_SIZE="1024M"
 

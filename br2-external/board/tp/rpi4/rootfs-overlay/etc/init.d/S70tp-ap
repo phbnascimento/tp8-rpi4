@@ -4,7 +4,7 @@
 #
 # Quem executa: o init do BusyBox (/etc/init.d/rcS), em ordem alfabética.
 # Antes deste: S11modules carrega o brcmfmac listado em /etc/modules-load.d,
-# S40network sobe a eth0 e S60dockerd sobe o dockerd. Depois: S99flask-tp.
+# S40network sobe a eth0 e S60dockerd sobe o dockerd. Depois: o S99 do container.
 #
 # Três diferenças conscientes em relação ao guia:
 #
