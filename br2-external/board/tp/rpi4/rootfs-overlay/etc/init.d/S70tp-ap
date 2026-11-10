@@ -1,0 +1,115 @@
+#!/bin/sh
+#
+# S70tp-ap — põe a wlan0 em modo Access Point (guia Aula 12, seção 13.4).
+#
+# Quem executa: o init do BusyBox (/etc/init.d/rcS), em ordem alfabética.
+# Antes deste: S11modules carrega o brcmfmac listado em /etc/modules-load.d,
+# S40network sobe a eth0 e S60dockerd sobe o dockerd. Depois: S99flask-tp.
+#
+# Três diferenças conscientes em relação ao guia:
+#
+#  1. A wlan0 NÃO está em /etc/network/interfaces. O guia (13.1) manda escrever
+#     lá um "auto wlan0 / iface wlan0 inet static", mas o arquivo do guia também
+#     apaga a eth0, que é como se chega na placa e é item do checklist do TP
+#     anterior. E "auto wlan0" faria o ifup do S40network falhar, porque a
+#     interface só existe depois de o firmware do Wi-Fi carregar. O endereço é
+#     configurado aqui, como o próprio script do guia faz.
+#
+#  2. Espera a wlan0 aparecer antes de configurar. O brcmfmac carrega o firmware
+#     de forma assíncrona; sem a espera, o "ip link set" corre antes de a
+#     interface existir e o AP não sobe.
+#
+#  3. Mensagens de erro apontam o que olhar. Sem a placa na mesa durante o
+#     desenvolvimento, a única defesa contra um boot silenciosamente quebrado é
+#     o script dizer onde está o problema.
+
+IFACE="wlan0"
+IP_AP="192.168.50.1/24"
+HOSTAPD_CONF="/etc/hostapd.conf"
+HOSTAPD_PID="/var/run/hostapd.pid"
+DNSMASQ_CONF="/etc/dnsmasq.conf"
+DNSMASQ_PID="/var/run/dnsmasq.pid"
+TIMEOUT=30
+
+esperar_iface() {
+	i=0
+	while [ ! -e "/sys/class/net/$IFACE" ]; do
+		i=$((i + 1))
+		if [ "$i" -ge "$TIMEOUT" ]; then
+			echo "[TP] $IFACE não apareceu em ${TIMEOUT}s."
+			echo "[TP]   o módulo carregou?    lsmod | grep brcmfmac"
+			echo "[TP]   o que o driver disse? dmesg | grep -i brcmf"
+			echo "[TP]   o firmware está lá?   ls /lib/firmware/brcm/brcmfmac43455-sdio.*"
+			return 1
+		fi
+		sleep 1
+	done
+	return 0
+}
+
+# O rfkill do brcmfmac começa desbloqueado, mas um bloqueio por software deixa o
+# hostapd falhar com uma mensagem pouco óbvia. Desbloquear pelo sysfs não
+# depende de ter o utilitário rfkill na imagem.
+desbloquear_radio() {
+	for r in /sys/class/rfkill/rfkill*; do
+		[ -w "$r/soft" ] && echo 0 > "$r/soft"
+	done
+	return 0
+}
+
+start() {
+	echo "[TP] esperando $IFACE..."
+	esperar_iface || return 1
+	desbloquear_radio
+
+	echo "[TP] configurando $IFACE com $IP_AP..."
+	ip link set "$IFACE" up || return 1
+	# O flush antes do add deixa o "restart" funcionar: sem ele, o segundo add
+	# falha com "File exists".
+	ip addr flush dev "$IFACE"
+	ip addr add "$IP_AP" dev "$IFACE" || return 1
+
+	echo "[TP] iniciando hostapd..."
+	if ! hostapd -B -P "$HOSTAPD_PID" "$HOSTAPD_CONF"; then
+		echo "[TP] hostapd não subiu. Rode 'hostapd -dd $HOSTAPD_CONF' para ver o motivo."
+		return 1
+	fi
+
+	echo "[TP] iniciando dnsmasq..."
+	if ! dnsmasq --conf-file="$DNSMASQ_CONF" --pid-file="$DNSMASQ_PID"; then
+		echo "[TP] dnsmasq não subiu. Rode 'dnsmasq --test -C $DNSMASQ_CONF'."
+		return 1
+	fi
+
+	echo "[TP] AP no ar: SSID TP9-GRUPO03, ${IP_AP%/*}"
+}
+
+parar() {
+	for pidfile in "$DNSMASQ_PID" "$HOSTAPD_PID"; do
+		if [ -f "$pidfile" ]; then
+			kill "$(cat "$pidfile")" 2>/dev/null
+			rm -f "$pidfile"
+		fi
+	done
+	ip addr flush dev "$IFACE" 2>/dev/null
+	ip link set "$IFACE" down 2>/dev/null
+	return 0
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		parar
+		;;
+	restart)
+		parar
+		sleep 1
+		start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac

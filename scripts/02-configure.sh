@@ -18,7 +18,9 @@ while IFS= read -r -d '' f; do
     sed -i 's/\r$//' "$f"; warn "CRLF removido de ${f#"$TP_ROOT"/}"
   fi
 done < <(find "$EXT_DIR" "$FLASK_DIR" "$TP_ROOT/scripts" -type f ! -name '*.tar' -print0)
-chmod +x "$OVERLAY_DIR/etc/init.d/S99flask-tp" "$OVERLAY_DIR/usr/bin/tp-evidencias" "$TP_ROOT"/scripts/*.sh
+chmod +x "$OVERLAY_DIR/etc/init.d/S99flask-tp" "$OVERLAY_DIR/etc/init.d/S70tp-ap" \
+  "$OVERLAY_DIR/usr/bin/tp-evidencias" "$BOARD_DIR/post-image.sh" "$BOARD_DIR/post-build.sh" \
+  "$TP_ROOT"/scripts/*.sh
 
 # --- 1. Identidade do sistema a partir do tp.env -------------------------
 info "Gerando /etc/issue (banner antes do login)..."
@@ -94,6 +96,42 @@ check 'BR2_LINUX_KERNEL=y'
 check 'BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/config_tp.txt"'
 # shellcheck disable=SC2016
 check 'BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/post-image.sh board/raspberrypi4-64/post-image.sh"'
+
+# --- Wi-Fi AP (TP 9) ------------------------------------------------------
+check 'BR2_PACKAGE_HOSTAPD=y'
+# O hostapd sem driver não serve para nada: o nl80211 é a interface de kernel
+# que o brcmfmac expõe. Sem esta opção o pacote compila e não abre a wlan0.
+check 'BR2_PACKAGE_HOSTAPD_DRIVER_NL80211=y'
+check 'BR2_PACKAGE_DNSMASQ=y'
+check 'BR2_PACKAGE_IW=y'
+check 'BR2_PACKAGE_LINUX_FIRMWARE_BRCM_BCM43XXX=y'
+# Esta é selecionada pela de cima e traz os binários que o driver realmente
+# pede (cyfmac43455-sdio.bin e .clm_blob). Conferir as duas deixa claro que o
+# select funcionou, em vez de descobrir no boot que falta firmware.
+check 'BR2_PACKAGE_LINUX_FIRMWARE_CYPRESS_CYW43XXX=y'
+check 'BR2_PACKAGE_WIRELESS_REGDB=y'
+# shellcheck disable=SC2016
+check 'BR2_ROOTFS_POST_BUILD_SCRIPT="board/raspberrypi4-64/post-build.sh $(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/post-build.sh"'
+
+# O SSID e a faixa DHCP são cobrados pelo enunciado; o canal e o modo definem a
+# banda. Conferir aqui evita descobrir na apresentação que um sed de rename
+# passou por cima do SSID.
+for linha in 'interface=wlan0' 'driver=nl80211' 'ssid=TP9-GRUPO03' 'hw_mode=g' 'channel=6' 'wpa=2'; do
+  grep -qxF "$linha" "$OVERLAY_DIR/etc/hostapd.conf" \
+    || die "hostapd.conf está sem a linha \"$linha\""
+done
+for linha in 'interface=wlan0' 'dhcp-range=192.168.50.10,192.168.50.100,255.255.255.0,12h'; do
+  grep -qxF "$linha" "$OVERLAY_DIR/etc/dnsmasq.conf" \
+    || die "dnsmasq.conf está sem a linha \"$linha\""
+done
+# WPA2 exige de 8 a 63 caracteres. Fora disso o hostapd recusa o arquivo e o AP
+# não sobe — erro fácil de cometer ao trocar a senha do laboratório.
+SENHA_WIFI="$(sed -n 's/^wpa_passphrase=//p' "$OVERLAY_DIR/etc/hostapd.conf")"
+[ "${#SENHA_WIFI}" -ge 8 ] && [ "${#SENHA_WIFI}" -le 63 ] \
+  || die "wpa_passphrase tem ${#SENHA_WIFI} caracteres; o WPA2 aceita de 8 a 63"
+# Sem esta linha a wlan0 não existe: brcmfmac é módulo e nada o carrega sozinho.
+grep -qxF 'brcmfmac' "$OVERLAY_DIR/etc/modules-load.d/tp.conf" \
+  || die "etc/modules-load.d/tp.conf não lista o brcmfmac"
 
 # O config.txt que vai para a placa tem de ser o de 64 bits. O guia do TP manda
 # copiar config_4.txt, que é a variante de 32 bits: com ela a imagem não dá

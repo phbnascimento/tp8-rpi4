@@ -60,3 +60,35 @@ BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/conf
 # segundo é o da própria Raspberry, que chama o genimage e monta a imagem.
 # A ordem é essencial: o genimage varre images/rpi-firmware/ quando roda.
 BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/post-image.sh board/raspberrypi4-64/post-image.sh"
+
+# --- Target packages → Networking applications ------------------------
+# Wi-Fi AP do TP 9. O hostapd põe a wlan0 em modo Access Point (precisa do
+# driver nl80211, que é o que o brcmfmac expõe); o dnsmasq dá os endereços da
+# faixa 192.168.50.10-100; o iw serve para diagnóstico na apresentação
+# ("iw dev", "iw reg get").
+BR2_PACKAGE_HOSTAPD=y
+BR2_PACKAGE_HOSTAPD_DRIVER_NL80211=y
+BR2_PACKAGE_DNSMASQ=y
+BR2_PACKAGE_IW=y
+
+# --- Target packages → Hardware handling → Firmware -------------------
+# Firmware do Wi-Fi onboard (BCM43455). O driver pede
+# brcm/brcmfmac43455-sdio.bin e .clm_blob; a opção BCM43XXX traz o NVRAM
+# específico da Pi 4 e seleciona o pacote Cypress, de onde vêm os dois
+# binários, ligados por symlink dentro de brcm/. Sem o firmware a wlan0 não
+# existe, e o kernel não reclama de forma óbvia.
+BR2_PACKAGE_LINUX_FIRMWARE=y
+BR2_PACKAGE_LINUX_FIRMWARE_BRCM_BCM43XXX=y
+
+# Base regulatória assinada (/lib/firmware/regulatory.db). Não é usada enquanto
+# o hostapd.conf não define country_code — está na imagem para que, se no dia a
+# potência ou o canal precisarem de ajuste, baste editar o hostapd.conf em vez
+# de recompilar.
+BR2_PACKAGE_WIRELESS_REGDB=y
+
+# --- System configuration → Custom scripts to run before creating images
+# O primeiro script é o da Raspberry, que já vinha da defconfig dela. O segundo
+# é o do TP: remove o /etc/init.d/S80dnsmasq que o pacote dnsmasq instala, para
+# o dnsmasq não subir duas vezes no boot (quem o inicia é o S70tp-ap, junto com
+# o hostapd).
+BR2_ROOTFS_POST_BUILD_SCRIPT="board/raspberrypi4-64/post-build.sh $(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/post-build.sh"

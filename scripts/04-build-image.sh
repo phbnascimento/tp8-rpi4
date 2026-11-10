@@ -10,6 +10,8 @@ require_not_root
   || die "falta rootfs-overlay/opt/docker/$IMAGE_TAR_NAME — rode ./scripts/03-build-flask-image.sh primeiro"
 [ -x "$OVERLAY_DIR/etc/init.d/S99flask-tp" ] \
   || die "S99flask-tp sem permissão de execução — rode ./scripts/02-configure.sh"
+[ -x "$OVERLAY_DIR/etc/init.d/S70tp-ap" ] \
+  || die "S70tp-ap sem permissão de execução — rode ./scripts/02-configure.sh"
 
 if [ ! -f "$OUT_DIR/.config" ]; then
   [ -f "$EXT_DIR/configs/$DEFCONFIG_NAME" ] || die "sem .config e sem defconfig — rode ./scripts/02-configure.sh"
@@ -62,16 +64,19 @@ fi
 
 # 1. O .dtbo versionado tem de corresponder ao .dts. Sem esta conferência, um
 #    .dts editado e um .dtbo esquecido passam despercebidos até o boot.
+# O 04 só chega aqui depois de um build completo, então o dtc do host existe.
+# Antes isto era um "if": quando o dtc faltava, a conferência era pulada em
+# silêncio e a linha de confirmação mais abaixo afirmava algo que não tinha sido
+# verificado.
 DTC="$OUT_DIR/host/bin/dtc"
-if [ -x "$DTC" ]; then
-  DTBO_TMP="$(mktemp)"
-  "$DTC" -@ -I dts -O dtb -o "$DTBO_TMP" "$BOARD_DIR/hcsr04-overlay.dts" 2>/dev/null \
-    || die "hcsr04-overlay.dts não compila"
-  cmp -s "$DTBO_TMP" "$BOARD_DIR/hcsr04.dtbo" \
-    || { rm -f "$DTBO_TMP"; die "hcsr04.dtbo está desatualizado em relação ao .dts.
+[ -x "$DTC" ] || die "não achei o dtc em $DTC — sem ele não dá para conferir se o hcsr04.dtbo corresponde ao .dts"
+DTBO_TMP="$(mktemp)"
+"$DTC" -@ -I dts -O dtb -o "$DTBO_TMP" "$BOARD_DIR/hcsr04-overlay.dts" 2>/dev/null \
+  || die "hcsr04-overlay.dts não compila"
+cmp -s "$DTBO_TMP" "$BOARD_DIR/hcsr04.dtbo" \
+  || { rm -f "$DTBO_TMP"; die "hcsr04.dtbo está desatualizado em relação ao .dts.
   Regere com: $DTC -@ -I dts -O dtb -o $BOARD_DIR/hcsr04.dtbo $BOARD_DIR/hcsr04-overlay.dts"; }
-  rm -f "$DTBO_TMP"
-fi
+rm -f "$DTBO_TMP"
 
 # 2. O módulo precisa estar no rootfs e o vermagic bater com o kernel desta
 #    imagem. Módulo compilado contra outro kernel é o erro clássico, e só
@@ -118,6 +123,107 @@ for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04'; do
   Se você mudou config_tp.txt, o pacote precisa ser reinstalado:
     make -C buildroot O=../output-rpi4 BR2_EXTERNAL=../br2-external rpi-firmware-reinstall all"
 done
+
+info "HC-SR04: .dtbo igual ao .dts, módulo no rootfs com vermagic $KVER, overlay e config.txt na partição de boot ✔"
+
+# --- Wi-Fi AP: pacotes, firmware, módulo e scripts de boot ---------------
+# Mesma lógica do bloco do HC-SR04: nada disto dá para testar sem a placa, e
+# cada peça que falta produz um sintoma indireto (wlan0 inexistente, hostapd
+# abortando) que só apareceria na apresentação.
+
+# 1) Os programas entraram na imagem.
+for f in usr/sbin/hostapd usr/bin/hostapd_cli usr/sbin/dnsmasq; do
+  [ -x "$T/$f" ] || die "/$f não está no rootfs (confira BR2_PACKAGE_HOSTAPD / BR2_PACKAGE_DNSMASQ)"
+done
+[ -x "$T/usr/sbin/iw" ] || [ -x "$T/usr/bin/iw" ] \
+  || die "o iw não está no rootfs (BR2_PACKAGE_IW)"
+
+# 2) O hostapd.conf da imagem tem de ser o NOSSO. O pacote hostapd instala um
+#    hostapd.conf de exemplo em /etc; se a cópia do overlay não acontecer, a
+#    imagem fica com o exemplo e o AP sobe com outro SSID — ou não sobe.
+for linha in 'ssid=TP9-GRUPO03' 'driver=nl80211' 'wpa=2'; do
+  grep -qxF "$linha" "$T/etc/hostapd.conf" \
+    || die "o /etc/hostapd.conf da imagem está sem \"$linha\" — o overlay sobrescreveu o exemplo do pacote?"
+done
+grep -qxF 'dhcp-range=192.168.50.10,192.168.50.100,255.255.255.0,12h' "$T/etc/dnsmasq.conf" \
+  || die "o /etc/dnsmasq.conf da imagem está sem a faixa DHCP exigida pelo enunciado"
+
+# 3) Um único script inicia o AP. O pacote dnsmasq instala um S80dnsmasq que,
+#    com o nosso /etc/dnsmasq.conf presente, subiria uma segunda instância; o
+#    post-build.sh do TP o remove.
+[ -x "$T/etc/init.d/S70tp-ap" ] || die "/etc/init.d/S70tp-ap não está no rootfs ou não é executável"
+[ ! -e "$T/etc/init.d/S80dnsmasq" ] \
+  || die "o S80dnsmasq do pacote dnsmasq continua no rootfs: o dnsmasq subiria duas vezes.
+  O post-build.sh do TP rodou? Confira BR2_ROOTFS_POST_BUILD_SCRIPT no .config."
+
+# 4) O brcmfmac é módulo e nada o carrega sozinho (devtmpfs puro, sem mdev nem
+#    eudev). Quem o carrega é o S11modules, lendo /etc/modules-load.d.
+grep -qxF 'brcmfmac' "$T/etc/modules-load.d/tp.conf" \
+  || die "/etc/modules-load.d/tp.conf não lista o brcmfmac — a wlan0 não vai existir no boot"
+for m in cfg80211 mac80211 brcmutil brcmfmac; do
+  find "$T/lib/modules/$KVER" -name "$m.ko*" | grep -q . \
+    || die "o módulo $m não está em /lib/modules/$KVER"
+done
+grep -q 'brcmfmac' "$T/lib/modules/$KVER/modules.dep" \
+  || die "brcmfmac não aparece em modules.dep — o modprobe do S11modules não vai encontrá-lo"
+# O brcmfmac 6.12 separa o código por fabricante e carrega o submódulo certo em
+# tempo de execução, por request_module("brcmfmac-%s"). Qual deles é o do 43455
+# está na tabela SDIO do driver, em bcmsdh.c:
+#   BRCMF_SDIO_DEVICE(SDIO_DEVICE_ID_BROADCOM_43455, WCC)
+# ou seja, WCC — apesar de o FIRMWARE vir do diretório cypress/ do
+# linux-firmware. São coisas diferentes e é fácil trocar uma pela outra.
+find "$T/lib/modules/$KVER" -name 'brcmfmac-wcc.ko*' | grep -q . \
+  || die "falta o submódulo brcmfmac-wcc, que é o que a tabela SDIO associa ao 43455"
+
+# 5) O firmware. O driver pede brcm/brcmfmac43455-sdio.{bin,clm_blob}, que no
+#    linux-firmware são symlinks para ../cypress/cyfmac43455-sdio.*; o pacote só
+#    cria o link se o alvo existir, e em silêncio se não. O -f segue o link, ou
+#    seja, confere que o arquivo apontado está lá de verdade.
+FW_BRCM="$T/lib/firmware/brcm"
+for f in brcmfmac43455-sdio.bin brcmfmac43455-sdio.clm_blob 'brcmfmac43455-sdio.raspberrypi,4-model-b.txt'; do
+  [ -f "$FW_BRCM/$f" ] \
+    || die "falta o firmware /lib/firmware/brcm/$f (sem ele a wlan0 não existe).
+  Confira BR2_PACKAGE_LINUX_FIRMWARE_BRCM_BCM43XXX e o symlink para ../cypress/."
+done
+for f in regulatory.db regulatory.db.p7s; do
+  [ -f "$T/lib/firmware/$f" ] || die "falta /lib/firmware/$f (BR2_PACKAGE_WIRELESS_REGDB)"
+done
+
+# 6) O kernel tem a pilha sem fio. Estes vêm do defconfig da Pi, não de um
+#    fragment nosso: se um dia saírem, o sintoma seria a wlan0 não aparecer.
+for o in CONFIG_CFG80211 CONFIG_MAC80211 CONFIG_BRCMFMAC; do
+  grep -qE "^$o=[ym]$" "$OUT_DIR/build/linux-custom/.config" \
+    || die "o kernel da imagem está sem $o"
+done
+
+# 7) Os dois arquivos de configuração passam pelo parser dos programas que vão
+#    lê-los — com os binários aarch64 da própria imagem, via binfmt/qemu. É o
+#    mais perto de testar o AP que dá para chegar sem a placa.
+# O timeout existe porque estes binários rodam traduzidos: se algum ficar
+# esperando um recurso que o host não tem, o build não pode travar por isso.
+if [ -x "$T/usr/sbin/dnsmasq" ] && QEMU_LD_PREFIX="$T" timeout 20 "$T/usr/sbin/dnsmasq" --version >/dev/null 2>&1; then
+  DNSMASQ_TESTE="$(QEMU_LD_PREFIX="$T" timeout 20 "$T/usr/sbin/dnsmasq" --test -C "$T/etc/dnsmasq.conf" 2>&1)" \
+    || die "o dnsmasq do alvo recusou o /etc/dnsmasq.conf:
+$DNSMASQ_TESTE"
+  HOSTAPD_TESTE="$(QEMU_LD_PREFIX="$T" timeout 20 "$T/usr/sbin/hostapd" "$T/etc/hostapd.conf" 2>&1 || true)"
+  # O hostapd não tem modo "só testar": ele lê o arquivo, depois tenta abrir a
+  # interface (que não existe no host). Erro de sintaxe aparece como "Line N:"
+  # antes disso.
+  if echo "$HOSTAPD_TESTE" | grep -qE '^Line [0-9]+:|Invalid configuration'; then
+    die "o hostapd do alvo recusou o /etc/hostapd.conf:
+$(echo "$HOSTAPD_TESTE" | grep -E '^Line [0-9]+:|Invalid configuration')"
+  fi
+  # Mostra onde o hostapd parou. Tem de ser DEPOIS de ler o arquivo — numa
+  # falha de interface ou de driver, não numa linha do .conf. Sem imprimir
+  # isto, um hostapd que abortasse antes de ler o arquivo deixaria a
+  # conferência passar sem conferir nada.
+  echo "$HOSTAPD_TESTE" | sed 's/^/  hostapd: /' | tail -3
+  info "hostapd.conf e dnsmasq.conf aceitos pelos binários aarch64 da imagem (binfmt) ✔"
+else
+  warn "não deu para rodar os binários do alvo no host (binfmt/qemu-aarch64 ausente): os arquivos de configuração do AP não foram testados."
+fi
+
+info "Wi-Fi AP: hostapd, dnsmasq e iw na imagem, firmware do BCM43455 presente, brcmfmac no modules-load.d, S80dnsmasq removido ✔"
 
 load_env
 # A espera pelo link da eth0 precisa sobreviver à cópia do overlay: sem ela a
@@ -189,4 +295,5 @@ fi
 record_hash "$IMG" "sdcard.img"
 checkpoint "imagem pronta em ${MIN} min: output-rpi4/images/sdcard.img
   Rootfs conferido: banner, rede, S60dockerd, S99flask-tp, flask-tp.tar, docker, curl, usuário $USUARIO.
+  HC-SR04 e Wi-Fi AP conferidos (driver, overlay, firmware, hostapd/dnsmasq).
   Próximo: ./scripts/05-flash-sd.sh"
