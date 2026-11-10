@@ -21,3 +21,14 @@ other/
 # Configuração local de ferramentas (não é do produto)
 .claude/
 CLAUDE.md
+
+# Artefatos da compilação do módulo do kernel. O build out-of-tree (M=...) do
+# kernel grava os .o/.ko e os arquivos de dependência ao lado do fonte, dentro
+# do próprio pacote — só o .c e o Makefile são código.
+br2-external/package/*/src/*.ko
+br2-external/package/*/src/*.o
+br2-external/package/*/src/*.mod
+br2-external/package/*/src/*.mod.c
+br2-external/package/*/src/.*.cmd
+br2-external/package/*/src/Module.symvers
+br2-external/package/*/src/modules.order
