@@ -85,7 +85,7 @@ buildroot-config/                       cópia da defconfig (gerada) + README
 evidence/                               evidências da validação
 ├── login/ docker/ network/ web/        capturas da Raspberry e do navegador
 ├── build/                              conferências feitas pelos scripts no host
-└── hashes.txt                          SHA-256 dos artefatos entregues
+└── hashes.txt                          SHA-256 dos artefatos do último build
 br2-external/                           árvore BR2_EXTERNAL (name: TP)
 ├── external.desc · Config.in · external.mk
 ├── configs/tp_rpi4_defconfig          configuração Buildroot do TP (canônica)
@@ -116,9 +116,13 @@ etapa do processo.
 | `buildroot/`, `output-rpi4/`, `*.img` | artefatos de build, reconstruídos pelos scripts |
 | `flask-tp.tar` (48 MB) | artefato de build; o que o define (`Dockerfile`, `app.py`, `requirements.txt`) está versionado |
 
-O SHA-256 de ambos os artefatos fica em [evidence/hashes.txt](evidence/hashes.txt). Build de Docker
-não é reprodutível byte a byte, então o hash identifica o artefato **entregue**, não valida uma
-reconstrução.
+O SHA-256 dos artefatos fica em [evidence/hashes.txt](evidence/hashes.txt). Esse arquivo é
+reescrito pelos scripts a cada build, então descreve **o último build feito neste repositório**.
+Os hashes da imagem efetivamente entregue no TP 8 estão preservados na branch `entrega-tp8` e na
+tag `tp8-final` — veja "Versão final entregue", no fim deste README.
+
+Build de Docker não é reprodutível byte a byte, então o hash identifica **aquele** artefato, não
+valida uma reconstrução.
 
 ## Procedimento de configuração
 
@@ -284,8 +288,9 @@ O sistema foi validado na Raspberry Pi 4 física. Registrado em [evidence/](evid
 | `network/04-curl-local.jpg` | aplicação respondendo a mensagem exigida na própria placa |
 | `network/05-curl-local-detalhe.jpg` | segundo registro do teste local |
 
-Os SHA-256 dos artefatos estão em [evidence/hashes.txt](evidence/hashes.txt), e as conferências
-que os scripts fazem no host, em [evidence/build/](evidence/build/):
+Os SHA-256 do último build estão em [evidence/hashes.txt](evidence/hashes.txt) — os da entrega do
+TP 8, na branch `entrega-tp8` — e as conferências que os scripts fazem no host, em
+[evidence/build/](evidence/build/):
 
 - [usuarios-na-imagem.txt](evidence/build/usuarios-na-imagem.txt) — `/etc/passwd` e `/etc/group`
   lidos de dentro do `rootfs.ext4` com `debugfs`;
@@ -348,9 +353,11 @@ Todos eram falhas que só apareceriam com a Raspberry na mesa, depois de horas d
 
 ## Versão final entregue
 
-Os valores abaixo descrevem a imagem efetivamente gravada e apresentada, preservada na tag
-`tp8-final`. Os nomes com `tp8` são os daquele momento: a nomenclatura do projeto passou depois
-a ser só `tp`, sem número, para não precisar ser renomeada a cada entrega.
+Os valores abaixo descrevem a imagem efetivamente gravada e apresentada. O repositório daquele
+momento está inteiro na branch `entrega-tp8` e na tag `tp8-final`: a branch existe para que o
+estado da entrega possa ser navegado direto no GitHub, e o desenvolvimento segue na `main`. Os
+nomes com `tp8` são os daquele momento — a nomenclatura do projeto passou depois a ser só `tp`,
+sem número, para não precisar ser renomeada a cada entrega.
 
 > **Atenção a quem baixar a imagem do Release:** ela é anterior ao rename e só aceita a senha
 > `tp8grupo03`, abaixo. Uma imagem compilada do estado atual do repositório usa `tpgrupo03`.
@@ -358,7 +365,7 @@ a ser só `tp`, sem número, para não precisar ser renomeada a cada entrega.
 | Item | Valor |
 |---|---|
 | Versão do projeto | 1.0 |
-| Branch | `main` |
+| Branch na entrega | `main`, preservada em `entrega-tp8` |
 | Tag | `tp8-final` |
 | Buildroot | 2026.08.1 |
 | Hostname | `rpi4-tp8-g03` |
@@ -371,3 +378,21 @@ a ser só `tp`, sem número, para não precisar ser renomeada a cada entrega.
 O arquivo [VERSION](VERSION) é gerado a partir do `tp.env` e reflete a configuração **atual** do
 repositório, já com a nomenclatura `tp`. A tabela acima é o registro da entrega do TP 8 e por isso
 guarda os nomes antigos.
+
+Para conferir a imagem do Release contra o registro original, sem depender do estado atual do
+repositório:
+
+```sh
+# o arquivo compactado, como o GitHub o publica:
+#   4112427bc460e90b2f885078942d155432e05a1e909087e3c70cf17ea6890db8
+sha256sum tp8-sdcard.img.gz
+
+# a imagem em si, que é o valor registrado na tabela acima:
+gunzip -c tp8-sdcard.img.gz | sha256sum
+
+# o registro como estava na entrega:
+git show entrega-tp8:evidence/hashes.txt
+```
+
+O `evidence/hashes.txt` da `main` **não** serve para essa conferência: os scripts o reescrevem a
+cada build, e hoje ele descreve um build posterior à entrega.

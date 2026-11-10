@@ -1,3 +1,5 @@
-a95183335b829030b610fd6bbd9cef293ebe80f4e2962cceea5fba7eba3e99a6  flask-tp8.tar
-ba2485d8759abef375e43975ec23b5e63de7f1077d2f83cd276f03c030cfab13  sdcard.img
+# Gerado pelos scripts (record_hash, em scripts/lib.sh): descreve o ÚLTIMO build
+# feito neste repositório, não a entrega do TP 8. O registro da entrega está na
+# branch entrega-tp8 e na tag tp8-final.
 b0d44e951501f8dbb33d2bb6dddac7f990119b556b2c01648cc4fb37e46ff9ac  flask-tp.tar
+62f8f0094f4b36f961a34601efebb74d31f40230db27790457f2ead9f1929cc5  sdcard.img
