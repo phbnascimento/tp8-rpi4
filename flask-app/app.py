@@ -9,7 +9,7 @@ import os
 import threading
 import time
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 
 app = Flask(__name__)
 
@@ -105,7 +105,8 @@ def api_distance():
 
 @app.get("/")
 def index():
-    return "Helooowww world eng. Computacional!!!!!!!"
+    """Dashboard. O HTML é estático; quem busca os números é o JavaScript."""
+    return render_template("index.html")
 
 
 if __name__ == "__main__":

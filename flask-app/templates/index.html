@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TP 9 - Distância Ultrassônica</title>
+  <!--
+    Tudo embutido de propósito: nenhuma fonte, folha de estilo ou biblioteca
+    externa. A rede do Access Point não tem saída para a internet, então
+    qualquer referência a um CDN deixaria a página quebrada justamente na
+    apresentação. O script 03 recusa este arquivo se encontrar nele qualquer
+    endereço de outro servidor.
+  -->
+  <style>
+    :root {
+      --fundo: #f4f7fa;
+      --texto: #102c50;
+      --cartao: #ffffff;
+      --destaque: #00868a;
+      --apagado: #8a94a6;
+      --erro: #b3261e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      background: var(--fundo);
+      color: var(--texto);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 16px;
+    }
+    .cartao {
+      background: var(--cartao);
+      padding: 40px 32px;
+      border-radius: 18px;
+      box-shadow: 0 8px 30px #0002;
+      text-align: center;
+      width: 100%;
+      max-width: 420px;
+    }
+    h1 { font-size: 20px; font-weight: 600; margin: 0 0 24px; }
+    .leitura { line-height: 1; }
+    #distancia {
+      font-size: 76px;
+      font-weight: 700;
+      color: var(--destaque);
+      font-variant-numeric: tabular-nums;
+    }
+    .unidade { font-size: 26px; color: var(--apagado); }
+    #milimetros { margin-top: 10px; font-size: 14px; color: var(--apagado); }
+    #estado {
+      margin-top: 22px;
+      font-size: 14px;
+      color: var(--apagado);
+      min-height: 2.6em;
+    }
+    /* Quando a leitura falha, o número fica apagado e volta para --.- : um
+       valor antigo em destaque pareceria medição atual. */
+    body.falha #distancia { color: var(--apagado); }
+    body.falha #estado { color: var(--erro); }
+    body.fora #distancia { color: var(--apagado); }
+    .rodape { margin-top: 24px; font-size: 12px; color: var(--apagado); }
+  </style>
+</head>
+<body>
+  <div class="cartao">
+    <h1>HC-SR04 &middot; distância em tempo real</h1>
+    <div class="leitura">
+      <span id="distancia">--.-</span><span class="unidade"> cm</span>
+    </div>
+    <div id="milimetros">&nbsp;</div>
+    <div id="estado">Aguardando a primeira leitura...</div>
+    <div class="rodape">Grupo 03 &middot; Sistemas Embarcados &middot; UNISANTA</div>
+  </div>
+
+  <script>
+    const elDistancia = document.querySelector("#distancia");
+    const elMilimetros = document.querySelector("#milimetros");
+    const elEstado = document.querySelector("#estado");
+
+    // Impede que requisições se acumulem: se a anterior ainda não voltou, o
+    // tique seguinte é descartado em vez de abrir outra conexão. Sem isso, uma
+    // leitura lenta viraria uma fila crescente de pedidos ao sensor.
+    let emVoo = false;
+
+    function falhar(mensagem) {
+      document.body.classList.add("falha");
+      document.body.classList.remove("fora");
+      elDistancia.textContent = "--.-";
+      elMilimetros.innerHTML = "&nbsp;";
+      elEstado.textContent = mensagem;
+    }
+
+    async function atualizar() {
+      if (emVoo) { return; }
+      emVoo = true;
+      // Um pedido pendurado não pode travar o laço: 2 s é bem mais do que os
+      // ~100 ms de uma medição.
+      const corte = new AbortController();
+      const relogio = setTimeout(() => corte.abort(), 2000);
+      try {
+        const resposta = await fetch("/api/distance", {
+          cache: "no-store",
+          signal: corte.signal,
+        });
+        const dados = await resposta.json();
+        if (!dados.ok) {
+          throw new Error(dados.error || "erro de leitura");
+        }
+
+        document.body.classList.remove("falha");
+        document.body.classList.toggle("fora", dados.in_range === false);
+        elDistancia.textContent = Number(dados.distance_cm).toFixed(1);
+        elMilimetros.textContent = dados.distance_mm + " mm";
+        elEstado.textContent = dados.in_range === false
+          ? "Fora da faixa útil do sensor (2 cm a 4 m) - provavelmente sem obstáculo"
+          : "Sensor OK";
+      } catch (erro) {
+        falhar(erro.name === "AbortError"
+          ? "Falha: o servidor não respondeu em 2 s"
+          : "Falha: " + erro.message);
+      } finally {
+        clearTimeout(relogio);
+        emVoo = false;
+      }
+    }
+
+    atualizar();
+    setInterval(atualizar, 500);
+  </script>
+</body>
+</html>

@@ -8,6 +8,16 @@ require_not_root
 docker info >/dev/null 2>&1 || die "Docker do host não responde (rode 00-setup-host.sh / verifique o grupo docker)"
 docker buildx use tpbuilder 2>/dev/null || docker buildx create --name tpbuilder --use >/dev/null
 
+# O dashboard tem de funcionar sem internet: a rede do Access Point não tem
+# NAT nem DNS. Uma fonte ou biblioteca vinda de CDN deixaria a página quebrada
+# exatamente na apresentação, e o navegador ainda esperaria o tempo de timeout
+# antes de desistir.
+if grep -nE 'https?://|//cdn' "$FLASK_DIR/templates/index.html"; then
+  die "o dashboard referencia um endereço externo (linhas acima).
+  A rede do AP não tem internet: tudo precisa estar embutido no arquivo."
+fi
+info "dashboard sem dependência externa ✔"
+
 info "Arquitetura do host: $(uname -m) → construindo para linux/arm64"
 cd "$FLASK_DIR"
 # As opções abaixo mantêm a imagem no formato que a Raspberry consegue carregar.
@@ -45,9 +55,18 @@ subir_teste() {
 
 info "Teste 1/2: container emulado SEM /dev/hcsr04..."
 subir_teste
+# O "/" agora serve o dashboard. Conferir duas marcas do arquivo prova de uma
+# vez que o render_template achou o template e que o COPY templates entrou na
+# imagem — sem isso, o Flask responderia 500 só na placa.
 RESP="$(curl -s http://127.0.0.1:15000/ || true)"
-[ "$RESP" = "Helooowww world eng. Computacional!!!!!!!" ] \
-  || die "container não respondeu a frase esperada em / (resposta: '$RESP')"
+for marca in 'id="distancia"' 'setInterval(atualizar, 500)'; do
+  case "$RESP" in
+    *"$marca"*) ;;
+    *) die "o / do container não devolveu o dashboard: falta \"$marca\".
+  O templates/ entrou na imagem? Confira o .dockerignore e o COPY do Dockerfile." ;;
+  esac
+done
+info "/ serve o dashboard, com atualização a cada 500 ms ✔"
 # Sem o device, a API tem de recusar com 503 e dizer o motivo. Esse é o estado
 # em que a aplicação fica se o módulo não carregar ou se o container subir sem
 # --device, e é o que o dashboard mostra em vez de um número inventado.
