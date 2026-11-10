@@ -1,0 +1,35 @@
+/*
+ * Overlay de Device Tree do HC-SR04.
+ *
+ * Descreve o sensor como um nó de hardware da placa, para que o kernel o
+ * encontre no boot e chame o probe() do driver hcsr04. É daqui que o driver
+ * tira os GPIOs: trocar de pino é editar este arquivo e recompilar o overlay,
+ * sem mexer no código C.
+ *
+ * TRIG = GPIO23 (pino físico 16)
+ * ECHO = GPIO24 (pino físico 18), através do divisor resistivo que baixa os
+ *        5 V do sensor para ~3,3 V. Ver docs/hardware.md.
+ *
+ * O terceiro valor de cada *-gpios é a flag de polaridade: 0 = ativo em
+ * nível alto, que é como o HC-SR04 trabalha nos dois pinos.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2711";
+
+	fragment@0 {
+		target-path = "/";
+
+		__overlay__ {
+			hcsr04 {
+				compatible = "unisanta,hcsr04";
+				trig-gpios = <&gpio 23 0>;
+				echo-gpios = <&gpio 24 0>;
+				status = "okay";
+			};
+		};
+	};
+};
