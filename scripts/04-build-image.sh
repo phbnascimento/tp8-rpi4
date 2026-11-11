@@ -8,10 +8,10 @@ require_not_root
 
 [ -f "$OVERLAY_DIR/opt/docker/$IMAGE_TAR_NAME" ] \
   || die "falta rootfs-overlay/opt/docker/$IMAGE_TAR_NAME — rode ./scripts/03-build-flask-image.sh primeiro"
-[ -x "$OVERLAY_DIR/etc/init.d/S99flask-tp" ] \
-  || die "S99flask-tp sem permissão de execução — rode ./scripts/02-configure.sh"
-[ -x "$OVERLAY_DIR/etc/init.d/S70tp-ap" ] \
-  || die "S70tp-ap sem permissão de execução — rode ./scripts/02-configure.sh"
+for s in S55hcsr04 S70tp-ap S99tp-app; do
+  [ -x "$OVERLAY_DIR/etc/init.d/$s" ] \
+    || die "$s sem permissão de execução — rode ./scripts/02-configure.sh"
+done
 
 if [ ! -f "$OUT_DIR/.config" ]; then
   [ -f "$EXT_DIR/configs/$DEFCONFIG_NAME" ] || die "sem .config e sem defconfig — rode ./scripts/02-configure.sh"
@@ -35,7 +35,7 @@ ls -lh "$OUT_DIR/images/"
 
 # Confere se o que importa entrou no rootfs final
 T="$OUT_DIR/target"
-for f in etc/issue etc/network/interfaces etc/init.d/S60dockerd etc/init.d/S99flask-tp \
+for f in etc/issue etc/network/interfaces etc/init.d/S60dockerd etc/init.d/S99tp-app \
          "opt/docker/$IMAGE_TAR_NAME" usr/bin/docker usr/bin/dockerd usr/bin/curl usr/bin/tp-evidencias; do
   [ -e "$T/$f" ] || die "não encontrei /$f no rootfs final (output-rpi4/target)"
 done
@@ -84,6 +84,32 @@ grep -qxF "IMAGE=\"$IMAGE_REF\"" "$S99" \
 grep -qxF "TAR=\"/opt/docker/$IMAGE_TAR_NAME\"" "$S99" \
   || die "o $(basename "$S99") não aponta para /opt/docker/$IMAGE_TAR_NAME"
 info "container: $IMAGE_REF no tar, no $(basename "$S99") e em /opt/docker, sem sobras ✔"
+
+# --- Boot: cada serviço com o seu script, e um só -------------------------
+# O rename S99flask-tp -> S99tp-app não apaga o arquivo antigo de target/, e
+# dois scripts S99 subiriam dois containers disputando a porta 80.
+N_S99="$(ls "$T"/etc/init.d/S99* 2>/dev/null | wc -l)"
+[ "$N_S99" = "1" ] \
+  || die "há $N_S99 scripts S99* em /etc/init.d — sobrou o de um nome anterior?
+$(ls "$T"/etc/init.d/S99* 2>/dev/null)
+  Apague o antigo de output-rpi4/target/etc/init.d/ e gere a imagem de novo."
+[ -x "$T/etc/init.d/S99tp-app" ] || die "/etc/init.d/S99tp-app não está no rootfs"
+[ -x "$T/etc/init.d/S55hcsr04" ] || die "/etc/init.d/S55hcsr04 não está no rootfs"
+
+# O container só enxerga o sensor com o --device, e o cliente só abre
+# http://192.168.50.1 sem porta se a publicação for na 80. As duas coisas estão
+# no checklist de avaliação e são invisíveis até alguém tentar usar.
+# Os comentários do próprio script falam de "--device", então procurar a
+# palavra solta acharia o comentário e a conferência passaria mesmo com a opção
+# removida — foi o que aconteceu no primeiro teste desta checagem. Só valem
+# linhas de código.
+grep -v '^[[:space:]]*#' "$T/etc/init.d/S99tp-app" | grep -q -- '--device' \
+  || die "o S99tp-app não passa --device: o container subiria sem o /dev/hcsr04"
+grep -qxF 'PORTA=80' "$T/etc/init.d/S99tp-app" \
+  || die "o S99tp-app não publica na porta 80: http://192.168.50.1 não abriria"
+grep -qxF 'hcsr04' "$T/etc/modules-load.d/tp.conf" \
+  || die "/etc/modules-load.d/tp.conf não lista o hcsr04: o /dev/hcsr04 não existiria no boot"
+info "boot: S55hcsr04 prepara o device, S99tp-app sobe o container com --device na porta 80 ✔"
 
 # --- HC-SR04: driver, overlay e partição de boot -------------------------
 # Nada disto dá para testar sem a placa, então cada peça é conferida aqui.

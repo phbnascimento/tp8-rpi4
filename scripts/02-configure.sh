@@ -18,7 +18,7 @@ while IFS= read -r -d '' f; do
     sed -i 's/\r$//' "$f"; warn "CRLF removido de ${f#"$TP_ROOT"/}"
   fi
 done < <(find "$EXT_DIR" "$FLASK_DIR" "$TP_ROOT/scripts" -type f ! -name '*.tar' -print0)
-chmod +x "$OVERLAY_DIR/etc/init.d/S99flask-tp" "$OVERLAY_DIR/etc/init.d/S70tp-ap" \
+chmod +x "$OVERLAY_DIR"/etc/init.d/S* \
   "$OVERLAY_DIR/usr/bin/tp-evidencias" "$BOARD_DIR/post-image.sh" "$BOARD_DIR/post-build.sh" \
   "$TP_ROOT"/scripts/*.sh
 

@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# S55hcsr04 — deixa o /dev/hcsr04 pronto antes de o container subir.
+#
+# Quem carrega o módulo é o S11modules, a partir de /etc/modules-load.d/tp.conf,
+# que roda bem antes deste script. Aqui só se espera o device aparecer e se
+# abre a permissão.
+#
+# Por que esperar: entre o modprobe e o /dev/hcsr04 existir, o kernel ainda
+# precisa casar o nó do Device Tree com o driver e chamar o probe(). É rápido,
+# mas não é instantâneo, e o S99 depois depende deste device.
+#
+# Por que o chmod: o devtmpfs cria o device como 0600 do root. O container roda
+# como root e enxergaria mesmo assim pelo --device, mas sem o 666 o usuário
+# aluno não consegue fazer "cat /dev/hcsr04" — que é a evidência que o
+# enunciado pede.
+
+DEVICE="/dev/hcsr04"
+TIMEOUT=15
+
+start() {
+	echo "[TP] esperando $DEVICE..."
+	i=0
+	while [ ! -e "$DEVICE" ]; do
+		i=$((i + 1))
+		if [ "$i" -ge "$TIMEOUT" ]; then
+			echo "[TP] $DEVICE não apareceu em ${TIMEOUT}s."
+			echo "[TP]   o módulo carregou?   lsmod | grep hcsr04"
+			echo "[TP]   o overlay carregou?  ls /proc/device-tree/hcsr04"
+			echo "[TP]   o que o kernel diz?  dmesg | grep -i hcsr04"
+			return 1
+		fi
+		sleep 1
+	done
+
+	chmod 666 "$DEVICE" || return 1
+	echo "[TP] $DEVICE pronto: $(ls -l "$DEVICE")"
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		# Nada a desfazer: o device some com o módulo, e descarregar o módulo
+		# no shutdown não traz benefício nenhum.
+		;;
+	restart)
+		start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac

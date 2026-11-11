@@ -28,7 +28,11 @@ run() {
 	run uname -a
 	run cat /etc/issue
 	run ip addr show eth0
+	run ip addr show wlan0
 	run ip route
+	run lsmod
+	run ls -l /dev/hcsr04
+	run cat /dev/hcsr04
 	run docker version
 	run docker info
 	run docker images
@@ -36,11 +40,14 @@ run() {
 	run docker network ls
 	run docker inspect tp-distance
 	run sha256sum /opt/docker/tp-distance.tar
-	run curl -s http://127.0.0.1:5000
+	run curl -s http://127.0.0.1/api/distance
 	echo
 } | tee -a "$OUT"
 
 echo
 echo "[TP] evidências acrescentadas em $OUT"
 IP="$(ip -4 addr show eth0 2>/dev/null | awk '/inet /{sub(/\/.*/,"",$2); print $2; exit}')"
-[ -n "$IP" ] && echo "[TP] no notebook, abra: http://$IP:5000"
+echo "[TP] no cliente do Wi-Fi, abra: http://192.168.50.1"
+# O "|| true" evita que o script termine com status de erro quando a eth0 não
+# tem IP — o que é o normal quando a placa está só no Wi-Fi.
+[ -n "$IP" ] && echo "[TP] pelo cabo, abra: http://$IP" || true
