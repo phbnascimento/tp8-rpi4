@@ -1,4 +1,4 @@
-projeto: TP Aula 8 - Buildroot + Docker + Flask - Raspberry Pi 4
+projeto: TP Aula 9 - HC-SR04 + Buildroot + Docker + Wi-Fi AP - Raspberry Pi 4
 versao: 1.0
 grupo: G03
 buildroot: 2026.08.1

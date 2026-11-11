@@ -1,4 +1,4 @@
 # Gerado por scripts/02-configure.sh a partir do tp.env
 BR2_TARGET_GENERIC_HOSTNAME="rpi4-tp-g03"
-BR2_TARGET_GENERIC_ISSUE="TP Aula 8 - Sistemas Embarcados - UNISANTA - Grupo G03"
+BR2_TARGET_GENERIC_ISSUE="TP Aula 9 - Sistemas Embarcados - UNISANTA - Grupo G03"
 BR2_TARGET_GENERIC_ROOT_PASSWD="123456"

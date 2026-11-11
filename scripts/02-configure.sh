@@ -26,8 +26,8 @@ chmod +x "$OVERLAY_DIR"/etc/init.d/S* \
 info "Gerando /etc/issue (banner antes do login)..."
 {
   echo "================================================"
-  echo " TP Aula 8 - Sistemas Embarcados - UNISANTA"
-  echo " Raspberry Pi 4 + Buildroot + Docker + Flask"
+  echo " TP Aula 9 - Sistemas Embarcados - UNISANTA"
+  echo " Raspberry Pi 4 + HC-SR04 + Buildroot + Docker + Wi-Fi AP"
   echo " Grupo: $GRUPO"
   for membro in "${INTEGRANTES[@]}"; do echo "  - $membro"; done
   echo "================================================"
@@ -44,7 +44,7 @@ info "Gerando identidade.fragment (hostname e senha do root)..."
 {
   echo "# Gerado por scripts/02-configure.sh a partir do tp.env"
   echo "BR2_TARGET_GENERIC_HOSTNAME=\"$HOSTNAME_RPI\""
-  echo "BR2_TARGET_GENERIC_ISSUE=\"TP Aula 8 - Sistemas Embarcados - UNISANTA - Grupo $GRUPO\""
+  echo "BR2_TARGET_GENERIC_ISSUE=\"TP Aula 9 - Sistemas Embarcados - UNISANTA - Grupo $GRUPO\""
   if [ -n "$ROOT_SENHA" ]; then
     echo "BR2_TARGET_GENERIC_ROOT_PASSWD=\"$ROOT_SENHA\""
   fi
@@ -153,7 +153,7 @@ mkdir -p "$BRCFG_DIR"
 cp "$EXT_DIR/configs/$DEFCONFIG_NAME" "$BRCFG_DIR/$DEFCONFIG_NAME"
 
 {
-  echo "projeto: TP Aula 8 - Buildroot + Docker + Flask - Raspberry Pi 4"
+  echo "projeto: TP Aula 9 - HC-SR04 + Buildroot + Docker + Wi-Fi AP - Raspberry Pi 4"
   echo "versao: $VERSAO_PROJETO"
   echo "grupo: $GRUPO"
   echo "buildroot: $BUILDROOT_VERSION"
