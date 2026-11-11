@@ -55,6 +55,15 @@ BR2_PACKAGE_HCSR04_DRIVER=y
 # não dá boot nesta configuração.
 BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/config_tp.txt"
 
+# --- Bootloaders → rpi-firmware → cmdline.txt -------------------------
+# Mesma linha de comando do padrão da Raspberry, mais "quiet loglevel=3".
+# O kernel escreve o log em DUAS consoles, uma delas serial a 115200 baud, e
+# cada printk é transmitido de forma síncrona: um log de 20 KB custa cerca de
+# 2 s de boot mesmo sem nada ligado na serial. O "quiet" não apaga nada — as
+# mensagens continuam no dmesg — e as mensagens dos nossos scripts de init não
+# são afetadas, porque são escritas em user space.
+BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/cmdline_tp.txt"
+
 # --- System configuration → Custom scripts to run after creating images -
 # O primeiro script copia hcsr04.dtbo para overlays/ da partição de boot; o
 # segundo é o da própria Raspberry, que chama o genimage e monta a imagem.

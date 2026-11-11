@@ -95,6 +95,8 @@ check 'BR2_LINUX_KERNEL=y'
 # shellcheck disable=SC2016
 check 'BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/config_tp.txt"'
 # shellcheck disable=SC2016
+check 'BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/cmdline_tp.txt"'
+# shellcheck disable=SC2016
 check 'BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/post-image.sh board/raspberrypi4-64/post-image.sh"'
 
 # --- Wi-Fi AP (TP 9) ------------------------------------------------------
@@ -136,9 +138,17 @@ grep -qxF 'brcmfmac' "$OVERLAY_DIR/etc/modules-load.d/tp.conf" \
 # O config.txt que vai para a placa tem de ser o de 64 bits. O guia do TP manda
 # copiar config_4.txt, que é a variante de 32 bits: com ela a imagem não dá
 # boot. Esta conferência existe para impedir que alguém "siga o guia" e quebre.
-for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04'; do
+for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04' 'disable_splash=1' 'boot_delay=0'; do
   grep -qxF "$linha" "$BOARD_DIR/config_tp.txt" \
     || die "config_tp.txt está sem a linha \"$linha\""
+done
+
+# O cmdline.txt precisa manter as duas consoles — tirar a serial deixaria o
+# diagnóstico sem saída — e ter o "quiet", que é o que evita transmitir o log
+# inteiro do kernel a 115200 baud durante o boot.
+for linha in 'console=tty1' 'console=ttyAMA0,115200' 'quiet'; do
+  grep -qF "$linha" "$BOARD_DIR/cmdline_tp.txt" \
+    || die "cmdline_tp.txt está sem \"$linha\""
 done
 
 # --- 5. Salva a defconfig do TP -------------------------------------------

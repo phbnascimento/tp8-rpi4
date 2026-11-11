@@ -171,7 +171,15 @@ FW="$OUT_DIR/images/rpi-firmware"
 # boot.vfat, e uma cópia velha ali sobrevive a mudanças no .dts.
 cmp -s "$FW/overlays/hcsr04.dtbo" "$BOARD_DIR/hcsr04.dtbo" \
   || die "o hcsr04.dtbo instalado em images/rpi-firmware/overlays difere do versionado"
-for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04'; do
+# O cmdline.txt é instalado pelo mesmo pacote e sofre do mesmo problema de
+# reinstalação: trocar a opção não reinstala sozinha.
+for linha in 'quiet' 'loglevel=3' 'console=tty1'; do
+  grep -qF "$linha" "$FW/cmdline.txt" \
+    || die "o cmdline.txt da imagem está sem \"$linha\".
+  Se você mudou cmdline_tp.txt, o pacote precisa ser reinstalado:
+    make -C buildroot O=../output-rpi4 BR2_EXTERNAL=../br2-external rpi-firmware-reinstall all"
+done
+for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04' 'disable_splash=1' 'boot_delay=0' 'initial_turbo=30'; do
   grep -qxF "$linha" "$FW/config.txt" \
     || die "o config.txt da imagem está sem \"$linha\".
   Se você mudou config_tp.txt, o pacote precisa ser reinstalado:

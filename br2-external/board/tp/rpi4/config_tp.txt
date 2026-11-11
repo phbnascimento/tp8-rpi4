@@ -32,3 +32,13 @@ arm_64bit=1
 # partição). Sem esta linha o kernel não cria o nó do sensor, o probe() do
 # driver nunca roda e /dev/hcsr04 não existe.
 dtoverlay=hcsr04
+
+# --- Tempo de boot ----------------------------------------------------
+# disable_splash: não desenha o arco-íris antes de entregar o controle.
+# boot_delay: o firmware não espera antes de carregar o kernel.
+# initial_turbo: mantém o clock máximo nos primeiros 30 s, o que acelera a
+#   leitura do kernel do cartão e a inicialização. Exige fonte adequada —
+#   com fonte fraca, clock alto no boot pode causar reinício.
+disable_splash=1
+boot_delay=0
+initial_turbo=30
