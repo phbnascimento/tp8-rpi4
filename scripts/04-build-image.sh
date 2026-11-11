@@ -8,7 +8,7 @@ require_not_root
 
 [ -f "$OVERLAY_DIR/opt/docker/$IMAGE_TAR_NAME" ] \
   || die "falta rootfs-overlay/opt/docker/$IMAGE_TAR_NAME — rode ./scripts/03-build-flask-image.sh primeiro"
-for s in S55hcsr04 S70tp-ap S99tp-app; do
+for s in S41eth0 S55hcsr04 S70tp-ap S99tp-app; do
   [ -x "$OVERLAY_DIR/etc/init.d/$s" ] \
     || die "$s sem permissão de execução — rode ./scripts/02-configure.sh"
 done
@@ -309,6 +309,14 @@ load_env
 # interface pode ficar sem IP no boot.
 grep -q 'wait-delay' "$T/etc/network/interfaces" \
   || die "/etc/network/interfaces está sem a espera pelo link da eth0 (wait-delay)"
+# A eth0 não pode voltar para o "auto": o ifup é síncrono e seguraria o boot
+# inteiro esperando o link — até 15 s quando não há cabo. Quem a sobe é o
+# S41eth0, em segundo plano.
+grep -qxF 'auto eth0' "$T/etc/network/interfaces" \
+  && die "a eth0 voltou a ser 'auto' no /etc/network/interfaces: o boot volta a
+  travar esperando o link. Quem deve subi-la é o /etc/init.d/S41eth0."
+[ -x "$T/etc/init.d/S41eth0" ] \
+  || die "/etc/init.d/S41eth0 não está no rootfs: a eth0 não subiria"
 # O usuário é criado ao gerar a imagem, então a conferência é feita dentro dela.
 DEBUGFS="$OUT_DIR/host/sbin/debugfs"
 ROOTFS_EXT4="$OUT_DIR/images/rootfs.ext4"
@@ -325,13 +333,14 @@ if [ -x "$DEBUGFS" ] && [ -f "$ROOTFS_EXT4" ]; then
   # Modo errado = script que não roda no boot, e o rootfs-overlay não carrega
   # permissão de quem o copiou. Conferir dentro da imagem, e não em target/,
   # porque é a imagem que vai para o cartão.
-  for arq in etc/init.d/S55hcsr04 etc/init.d/S70tp-ap etc/init.d/S99tp-app usr/bin/tp-evidencias; do
+  for arq in etc/init.d/S41eth0 etc/init.d/S55hcsr04 etc/init.d/S70tp-ap \
+             etc/init.d/S99tp-app usr/bin/tp-evidencias; do
     MODO="$("$DEBUGFS" -R "stat /$arq" "$ROOTFS_EXT4" 2>/dev/null \
       | sed -n 's/.*Mode: *0*\([0-7]\{3,4\}\).*/\1/p' | head -1)"
     [ "$MODO" = "755" ] \
       || die "/$arq está com modo ${MODO:-?} dentro da imagem, esperado 755 — rode ./scripts/02-configure.sh"
   done
-  info "os quatro executáveis do TP estão 0755 DENTRO da imagem ✔"
+  info "os cinco executáveis do TP estão 0755 DENTRO da imagem ✔"
 
   # Evidência do boot, lida da imagem: é o que permite mostrar a sequência sem
   # ter a placa ligada.

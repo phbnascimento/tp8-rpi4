@@ -29,20 +29,22 @@ HOSTAPD_CONF="/etc/hostapd.conf"
 HOSTAPD_PID="/var/run/hostapd.pid"
 DNSMASQ_CONF="/etc/dnsmasq.conf"
 DNSMASQ_PID="/var/run/dnsmasq.pid"
-TIMEOUT=30
+# 150 tentativas de 0,2 s = 30 s; intervalo curto pelo mesmo motivo do S55.
+TENTATIVAS=150
+INTERVALO=0.2
 
 esperar_iface() {
 	i=0
 	while [ ! -e "/sys/class/net/$IFACE" ]; do
 		i=$((i + 1))
-		if [ "$i" -ge "$TIMEOUT" ]; then
-			echo "[TP] $IFACE não apareceu em ${TIMEOUT}s."
+		if [ "$i" -ge "$TENTATIVAS" ]; then
+			echo "[TP] $IFACE não apareceu em 30s."
 			echo "[TP]   o módulo carregou?    lsmod | grep brcmfmac"
 			echo "[TP]   o que o driver disse? dmesg | grep -i brcmf"
 			echo "[TP]   o firmware está lá?   ls /lib/firmware/brcm/brcmfmac43455-sdio.*"
 			return 1
 		fi
-		sleep 1
+		sleep "$INTERVALO"
 	done
 	return 0
 }

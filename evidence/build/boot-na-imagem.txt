@@ -11,6 +11,7 @@ S11modules
 S30cgroupfs2
 S35iptables
 S40network
+S41eth0
 S50crond
 S55hcsr04
 S60dockerd

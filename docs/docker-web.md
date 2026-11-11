@@ -130,8 +130,9 @@ que acabou de ligar, o pedido DHCP pode sair antes de o link existir, e a interf
 alguém intervir — defeito que aparece só em alguns boots, o que o torna difícil de diagnosticar. O
 `scripts/04-build-image.sh` confere essa diretiva dentro da imagem.
 
-A `eth0` continua por DHCP e serve para administrar a placa; o dashboard é servido pela `wlan0`,
-descrita em [wifi-ap.md](wifi-ap.md).
+A `eth0` continua por DHCP e serve para administrar a placa, mas sobe **em segundo plano**, pelo
+`S41eth0`: o `ifup` é síncrono e, sem cabo, seguraria o boot pelos 15 s do `wait-delay`. O
+dashboard é servido pela `wlan0`, descrita em [wifi-ap.md](wifi-ap.md).
 
 ## Inicialização automática
 

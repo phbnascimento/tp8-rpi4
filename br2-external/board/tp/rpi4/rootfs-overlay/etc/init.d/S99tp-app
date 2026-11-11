@@ -21,7 +21,11 @@ CONTAINER="tp-distance"
 TAR="/opt/docker/tp-distance.tar"
 DEVICE="/dev/hcsr04"
 PORTA=80
-TIMEOUT=60
+# 300 tentativas de 0,2 s = 60 s. É a espera que mais pesa no tempo total: o
+# dockerd fica pronto num instante qualquer, e sondar de segundo em segundo
+# arredonda isso para cima.
+TENTATIVAS=300
+INTERVALO=0.2
 
 start_app() {
 	# O S55hcsr04 já esperou pelo device; esta é a segunda linha de defesa,
@@ -36,11 +40,11 @@ start_app() {
 	i=0
 	while ! docker info >/dev/null 2>&1; do
 		i=$((i + 1))
-		if [ "$i" -ge "$TIMEOUT" ]; then
-			echo "[TP] Docker não ficou disponível em ${TIMEOUT}s."
+		if [ "$i" -ge "$TENTATIVAS" ]; then
+			echo "[TP] Docker não ficou disponível em 60s."
 			return 1
 		fi
-		sleep 1
+		sleep "$INTERVALO"
 	done
 
 	if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then

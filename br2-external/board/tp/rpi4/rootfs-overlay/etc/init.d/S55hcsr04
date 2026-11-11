@@ -16,21 +16,25 @@
 # enunciado pede.
 
 DEVICE="/dev/hcsr04"
-TIMEOUT=15
+# 75 tentativas de 0,2 s = 15 s. O intervalo curto existe porque o device
+# costuma aparecer em menos de um segundo, e sondar de segundo em segundo
+# jogaria fora quase um segundo de boot.
+TENTATIVAS=75
+INTERVALO=0.2
 
 start() {
 	echo "[TP] esperando $DEVICE..."
 	i=0
 	while [ ! -e "$DEVICE" ]; do
 		i=$((i + 1))
-		if [ "$i" -ge "$TIMEOUT" ]; then
-			echo "[TP] $DEVICE não apareceu em ${TIMEOUT}s."
+		if [ "$i" -ge "$TENTATIVAS" ]; then
+			echo "[TP] $DEVICE não apareceu em 15s."
 			echo "[TP]   o módulo carregou?   lsmod | grep hcsr04"
 			echo "[TP]   o overlay carregou?  ls /proc/device-tree/hcsr04"
 			echo "[TP]   o que o kernel diz?  dmesg | grep -i hcsr04"
 			return 1
 		fi
-		sleep 1
+		sleep "$INTERVALO"
 	done
 
 	chmod 666 "$DEVICE" || return 1

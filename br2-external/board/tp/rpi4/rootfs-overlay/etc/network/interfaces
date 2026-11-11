@@ -10,7 +10,9 @@
 auto lo
 iface lo inet loopback
 
-auto eth0
+# Sem "auto": quem sobe a eth0 é o S41eth0, em segundo plano, para a espera
+# pelo link não atrasar o boot inteiro. O wait-delay abaixo continua valendo
+# dentro daquele ifup.
 iface eth0 inet dhcp
   pre-up /etc/network/nfs_check
   wait-delay 15

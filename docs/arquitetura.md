@@ -63,7 +63,8 @@ numeração expressa a dependência:
 | Script | De onde vem | O que faz |
 |---|---|---|
 | `S11modules` | Buildroot | `modprobe` do que estiver em `/etc/modules-load.d/` — aqui, `brcmfmac` e `hcsr04` |
-| `S40network` | Buildroot | sobe a `eth0` por DHCP |
+| `S40network` | Buildroot | sobe a `lo` |
+| `S41eth0` | nosso | dispara o DHCP da `eth0` **em segundo plano** |
 | `S55hcsr04` | nosso | espera o `/dev/hcsr04` aparecer e faz `chmod 666` |
 | `S60dockerd` | pacote `docker-engine` | sobe o `dockerd` |
 | `S70tp-ap` | nosso | `wlan0`, IP estático, `hostapd`, `dnsmasq` |
@@ -74,6 +75,12 @@ numeração sugerida pelo próprio guia faz o contrário — `S60dockerd` antes 
 funcionam, e mantivemos a numeração do guia: a publicação de porta do Docker é uma regra de
 `iptables` que vale para interfaces que apareçam depois, e o container só sobe no `S99`, quando as
 duas camadas já existem.
+
+**A `eth0` saiu do caminho crítico.** O `ifup` é síncrono: com `auto eth0` no
+`/etc/network/interfaces`, o boot inteiro para até o link subir e o DHCP responder — até 15 s
+quando não há cabo. Como o acesso normal é pelo Wi-Fi da própria placa, a interface passou a subir
+em segundo plano, pelo `S41eth0`. A espera pelo link continua existindo dentro daquele `ifup`; ela
+só não atrasa mais o resto.
 
 **Os scripts não confiam só na ordem.** Cada um espera a condição real de que depende — o device
 existir, o `dockerd` responder, a `wlan0` aparecer — com prazo e mensagem de erro que diz onde

@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# S41eth0 — sobe a eth0 por DHCP SEM bloquear o boot.
+#
+# O ifup é síncrono: com "auto eth0" no /etc/network/interfaces, o S40network
+# segura o boot inteiro até o link subir e o DHCP responder. Com cabo e um
+# servidor rápido isso custa poucos segundos; SEM CABO custa os 15 s do
+# wait-delay, e no TP 9 o acesso normal é pelo Wi-Fi da própria placa, não
+# pelo cabo.
+#
+# Então a eth0 saiu do "auto" e sobe aqui, em segundo plano. O wait-delay
+# continua valendo DENTRO deste ifup — ele é que impede o udhcpc de disparar
+# antes de o link existir —, só que a espera deixa de atrasar o resto do boot.
+#
+# Consequência aceita: nos primeiros segundos a placa ainda não tem IP no
+# cabo. Quem depende disso é só a administração por SSH/scp, não a demonstração.
+
+case "$1" in
+	start)
+		echo "[TP] eth0: DHCP em segundo plano"
+		ifup eth0 >/dev/null 2>&1 &
+		;;
+	stop)
+		ifdown eth0 >/dev/null 2>&1 || true
+		;;
+	restart)
+		ifdown eth0 >/dev/null 2>&1 || true
+		ifup eth0 >/dev/null 2>&1 &
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac
