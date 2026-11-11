@@ -1,0 +1,30 @@
+# Lido de images/rootfs.ext4 com debugfs, sem montar a imagem.
+
+--- /etc/init.d (ordem em que o rcS executa) ---
+rcK
+rcS
+S01seedrng
+S01syslogd
+S02klogd
+S02sysctl
+S11modules
+S30cgroupfs2
+S35iptables
+S40network
+S50crond
+S55hcsr04
+S60dockerd
+S70tp-ap
+S99tp-app
+
+--- /etc/modules-load.d/tp.conf (módulos carregados pelo S11modules) ---
+brcmfmac
+hcsr04
+
+--- docker run do S99tp-app ---
+	docker run -d \
+		--name "$CONTAINER" \
+		--restart unless-stopped \
+		--device "$DEVICE:$DEVICE" \
+		-p "$PORTA:5000" \
+		"$IMAGE" >/dev/null

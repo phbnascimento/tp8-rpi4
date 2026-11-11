@@ -133,7 +133,9 @@ rm -f "$DTBO_TMP"
 # 2. O módulo precisa estar no rootfs e o vermagic bater com o kernel desta
 #    imagem. Módulo compilado contra outro kernel é o erro clássico, e só
 #    apareceria como modprobe falhando no boot.
-KVER="$(ls "$T/lib/modules" 2>/dev/null | head -1)"
+# O "|| true" é o mesmo caso do S99= mais abaixo: sem ele, um rootfs sem
+# /lib/modules faria o set -e matar o script antes da mensagem explicativa.
+KVER="$(ls "$T/lib/modules" 2>/dev/null | head -1 || true)"
 [ -n "$KVER" ] || die "não há /lib/modules no rootfs"
 KO="$(find "$T/lib/modules/$KVER" -name 'hcsr04.ko*' | head -1)"
 [ -n "$KO" ] || die "hcsr04.ko não foi instalado em /lib/modules/$KVER
@@ -247,6 +249,23 @@ for o in CONFIG_CFG80211 CONFIG_MAC80211 CONFIG_BRCMFMAC; do
   grep -qE "^$o=[ym]$" "$OUT_DIR/build/linux-custom/.config" \
     || die "o kernel da imagem está sem $o"
 done
+# A base de que tudo neste TP depende: sem MODULES não há como carregar o
+# driver; sem GPIOLIB e OF o probe do hcsr04 nunca é chamado; sem DEVTMPFS_MOUNT
+# o /dev fica vazio e nem o console se comporta. Vêm do defconfig da Pi, então o
+# risco não é configurá-los errado: é alguém desligar um deles sem perceber.
+for o in CONFIG_MODULES CONFIG_GPIOLIB CONFIG_OF CONFIG_DEVTMPFS_MOUNT; do
+  grep -qE "^$o=y$" "$OUT_DIR/build/linux-custom/.config" \
+    || die "o kernel da imagem está sem $o=y"
+done
+
+# Um serviço, um script. O pacote dnsmasq já teve o seu removido pelo
+# post-build; se um dia o hostapd ganhar um script no Buildroot, ele subiria
+# junto com o S70tp-ap e os dois disputariam a wlan0.
+DUPLICADOS="$(ls "$T"/etc/init.d/*hostapd* "$T"/etc/init.d/*dnsmasq* 2>/dev/null || true)"
+[ -z "$DUPLICADOS" ] \
+  || die "há scripts de init próprios de hostapd/dnsmasq no rootfs:
+$DUPLICADOS
+  Quem sobe os dois é o S70tp-ap; remova o duplicado no post-build.sh."
 
 # 7) Os dois arquivos de configuração passam pelo parser dos programas que vão
 #    lê-los — com os binários aarch64 da própria imagem, via binfmt/qemu. É o
@@ -294,6 +313,35 @@ if [ -x "$DEBUGFS" ] && [ -f "$ROOTFS_EXT4" ]; then
   echo "$IMG_GROUP" | grep -q "^docker:.*$USUARIO" \
     || die "usuário $USUARIO não está no grupo docker dentro de images/rootfs.ext4"
   info "usuário $USUARIO e grupo docker conferidos DENTRO do rootfs.ext4 ✔"
+
+  # Modo errado = script que não roda no boot, e o rootfs-overlay não carrega
+  # permissão de quem o copiou. Conferir dentro da imagem, e não em target/,
+  # porque é a imagem que vai para o cartão.
+  for arq in etc/init.d/S55hcsr04 etc/init.d/S70tp-ap etc/init.d/S99tp-app usr/bin/tp-evidencias; do
+    MODO="$("$DEBUGFS" -R "stat /$arq" "$ROOTFS_EXT4" 2>/dev/null \
+      | sed -n 's/.*Mode: *0*\([0-7]\{3,4\}\).*/\1/p' | head -1)"
+    [ "$MODO" = "755" ] \
+      || die "/$arq está com modo ${MODO:-?} dentro da imagem, esperado 755 — rode ./scripts/02-configure.sh"
+  done
+  info "os quatro executáveis do TP estão 0755 DENTRO da imagem ✔"
+
+  # Evidência do boot, lida da imagem: é o que permite mostrar a sequência sem
+  # ter a placa ligada.
+  { echo "# Lido de images/rootfs.ext4 com debugfs, sem montar a imagem."
+    echo
+    echo "--- /etc/init.d (ordem em que o rcS executa) ---"
+    "$DEBUGFS" -R 'ls -l /etc/init.d' "$ROOTFS_EXT4" 2>/dev/null \
+      | awk '{print $NF}' | grep -E '^(S|rc)' | sort
+    echo
+    echo "--- /etc/modules-load.d/tp.conf (módulos carregados pelo S11modules) ---"
+    "$DEBUGFS" -R 'cat /etc/modules-load.d/tp.conf' "$ROOTFS_EXT4" 2>/dev/null \
+      | grep -v '^#' | grep -v '^$'
+    echo
+    echo "--- docker run do S99tp-app ---"
+    "$DEBUGFS" -R 'cat /etc/init.d/S99tp-app' "$ROOTFS_EXT4" 2>/dev/null \
+      | sed -n '/docker run/,/IMAGE/p'
+  } > "$EVID_BUILD_DIR/boot-na-imagem.txt"
+  info "sequência de boot registrada em evidence/build/boot-na-imagem.txt"
   mkdir -p "$EVID_BUILD_DIR"
   { echo "# /etc/passwd e /etc/group lidos de images/rootfs.ext4 com debugfs"; echo
     echo "--- /etc/passwd ---"; echo "$IMG_PASSWD"
