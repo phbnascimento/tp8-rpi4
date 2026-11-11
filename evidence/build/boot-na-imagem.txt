@@ -26,6 +26,6 @@ hcsr04
 	docker run -d \
 		--name "$CONTAINER" \
 		--restart unless-stopped \
-		--device "$DEVICE:$DEVICE" \
+		$ARGS_DEVICE \
 		-p "$PORTA:5000" \
 		"$IMAGE" >/dev/null

@@ -82,7 +82,10 @@ da imagem.
 3. `ip link set wlan0 up`, `ip addr flush`, `ip addr add 192.168.50.1/24` — o `flush` antes do
    `add` é o que faz o `restart` funcionar, em vez de falhar com "File exists";
 4. `hostapd -B`;
-5. `dnsmasq`.
+5. **repõe o endereço se ele tiver caído.** O `hostapd` reconfigura a interface para modo AP, e
+   essa transição pode derrubar o IPv4. O sintoma seria cruel — a rede aparece, o cliente associa
+   e nada responde —, então a verificação é feita e a reposição é idempotente;
+6. `dnsmasq`.
 
 Quando a `wlan0` não aparece, o script imprime o que olhar: `lsmod | grep brcmfmac`,
 `dmesg | grep -i brcmf` e a listagem de `/lib/firmware/brcm/`. Num sistema sem tela de diagnóstico,

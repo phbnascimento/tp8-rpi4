@@ -77,6 +77,15 @@ start() {
 		return 1
 	fi
 
+	# O hostapd reconfigura a interface para modo AP, e essa transição pode
+	# derrubar o endereço IPv4. Se isso acontecer, o sintoma é cruel: a rede
+	# aparece, o cliente associa, e nada responde — porque a placa ficou sem
+	# endereço e o dnsmasq não teria em que faixa servir. Repor é idempotente.
+	if ! ip addr show "$IFACE" | grep -q "${IP_AP%/*}"; then
+		echo "[TP] o endereço caiu ao subir o AP; repondo"
+		ip addr add "$IP_AP" dev "$IFACE" || return 1
+	fi
+
 	echo "[TP] iniciando dnsmasq..."
 	if ! dnsmasq --conf-file="$DNSMASQ_CONF" --pid-file="$DNSMASQ_PID"; then
 		echo "[TP] dnsmasq não subiu. Rode 'dnsmasq --test -C $DNSMASQ_CONF'."

@@ -139,17 +139,18 @@ dashboard é servido pela `wlan0`, descrita em [wifi-ap.md](wifi-ap.md).
 `S60dockerd` (do pacote) sobe o daemon. [`S99tp-app`](../br2-external/board/tp/rpi4/rootfs-overlay/etc/init.d/S99tp-app),
 nosso, roda depois:
 
-1. confere que `/dev/hcsr04` existe — o container subiria sem sensor, e é melhor falhar dizendo
-   por quê;
+1. olha se `/dev/hcsr04` existe. Se **não** existir, o container sobe mesmo assim, sem o
+   `--device`, e avisa no console: recusar trocaria uma falha parcial por um apagão total — sem
+   container não há dashboard, e a mensagem de erro que a API sabe dar nunca apareceria;
 2. espera `docker info` responder (até 60 tentativas, 1 s cada), evitando a corrida com o daemon
    ainda subindo;
 3. `docker load -i /opt/docker/tp-distance.tar`, **apenas se** `docker image inspect` não encontrar
    a imagem — por isso só no primeiro boot;
-4. se o container já existe, **confere se ele tem o device**; se não tiver, remove e recria. Um
-   container criado por uma imagem anterior sobrevive em `/var/lib/docker` e seria reaproveitado
-   com as opções antigas — sem o device, ou na porta errada;
-5. `docker start` se existe e está correto; senão `docker run -d --restart unless-stopped
-   --device /dev/hcsr04:/dev/hcsr04 -p 80:5000 tp-distance:1.0`.
+4. se o container já existe, só o reaproveita quando o que ele tem **casa com o estado atual do
+   sensor** — um container com `--device` não inicia se o device sumiu, e um sem `--device` nunca
+   enxergaria o sensor. Fora disso, remove e recria;
+5. `docker start` se casa; senão `docker run -d --restart unless-stopped
+   [--device /dev/hcsr04:/dev/hcsr04] -p 80:5000 tp-distance:1.0`.
 
 O ramo do `docker start` não é redundante: no desligamento o `rcK` chama a ação `stop`, e um
 `docker stop` marca o container como parado pelo usuário — estado em que a política

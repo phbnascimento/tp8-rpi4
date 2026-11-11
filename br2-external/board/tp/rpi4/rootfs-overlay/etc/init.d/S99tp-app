@@ -28,12 +28,23 @@ TENTATIVAS=300
 INTERVALO=0.2
 
 start_app() {
-	# O S55hcsr04 já esperou pelo device; esta é a segunda linha de defesa,
-	# para o caso de o container ser reiniciado à mão com o sensor desligado.
-	if [ ! -e "$DEVICE" ]; then
-		echo "[TP] $DEVICE não existe — o container subiria sem sensor."
-		echo "[TP] confira o S55hcsr04 e 'dmesg | grep -i hcsr04'."
-		return 1
+	# Se o device não existe, o container sobe ASSIM MESMO, sem o --device.
+	#
+	# A tentação é recusar: container sem sensor não mede nada. Mas recusar
+	# troca uma falha parcial por um apagão total — sem container não há
+	# dashboard, não há página, e a mensagem de erro que a API sabe dar
+	# ("/dev/hcsr04 não existe: módulo não carregado, ou container sem
+	# --device") nunca chega a ser exibida. Melhor abrir a página dizendo o
+	# que está errado do que não abrir nada.
+	if [ -e "$DEVICE" ]; then
+		QUER_DEVICE=sim
+		ARGS_DEVICE="--device $DEVICE:$DEVICE"
+	else
+		QUER_DEVICE=nao
+		ARGS_DEVICE=""
+		echo "[TP] AVISO: $DEVICE não existe — subindo o container SEM o sensor."
+		echo "[TP] o dashboard abre e mostra o erro de leitura."
+		echo "[TP] confira: lsmod | grep hcsr04 ; dmesg | grep -i hcsr04"
 	fi
 
 	echo "[TP] aguardando Docker..."
@@ -53,29 +64,31 @@ start_app() {
 	fi
 
 	# Um container criado por uma imagem anterior sobrevive em /var/lib/docker e
-	# seria reaproveitado com as opções ANTIGAS — sem o device, ou na porta
-	# errada. Então, antes de reaproveitar, confere se ele tem o device.
+	# seria reaproveitado com as opções ANTIGAS. Reaproveitar só serve se o que
+	# ele tem bate com o que queremos agora: um container com --device não
+	# inicia se o device sumiu, e um sem --device nunca enxergaria o sensor.
 	if docker container inspect "$CONTAINER" >/dev/null 2>&1; then
 		TEM_DEVICE="$(docker container inspect "$CONTAINER" \
 			--format '{{range .HostConfig.Devices}}{{.PathInContainer}} {{end}}' 2>/dev/null)"
 		case "$TEM_DEVICE" in
-			*"$DEVICE"*)
-				echo "[TP] iniciando container existente $CONTAINER"
-				docker start "$CONTAINER" >/dev/null
-				return $?
-				;;
-			*)
-				echo "[TP] container antigo sem $DEVICE: recriando"
-				docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
-				;;
+			*"$DEVICE"*) ATUAL=sim ;;
+			*)           ATUAL=nao ;;
 		esac
+		if [ "$ATUAL" = "$QUER_DEVICE" ]; then
+			echo "[TP] iniciando container existente $CONTAINER"
+			docker start "$CONTAINER" >/dev/null
+			return $?
+		fi
+		echo "[TP] container existente não casa com o estado do sensor: recriando"
+		docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 	fi
 
 	echo "[TP] criando container $CONTAINER na porta $PORTA"
+	# shellcheck disable=SC2086  # ARGS_DEVICE precisa ser dividido em palavras
 	docker run -d \
 		--name "$CONTAINER" \
 		--restart unless-stopped \
-		--device "$DEVICE:$DEVICE" \
+		$ARGS_DEVICE \
 		-p "$PORTA:5000" \
 		"$IMAGE" >/dev/null
 }
