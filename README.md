@@ -1,4 +1,4 @@
-# TP Aula 8 — Buildroot + Docker + Flask na Raspberry Pi 4
+# TP Aula 9 — HC-SR04 + Buildroot + Docker + Wi-Fi AP na Raspberry Pi 4
 
 **Disciplina:** Sistemas Embarcados · Engenharia de Computação · UNISANTA
 
@@ -13,17 +13,21 @@
 
 ## Objetivo
 
-Construir, com o Buildroot, uma imagem Linux embarcada para a Raspberry Pi 4 que, ao ser ligada,
-inicie o sistema, permita login com o usuário configurado durante o build, suba o Docker
-automaticamente, carregue um container Flask embarcado na própria imagem e publique a aplicação em
-`http://IP_DA_RASPBERRY:5000`, respondendo:
+Construir, com o Buildroot, uma imagem Linux embarcada para a Raspberry Pi 4 que, ao ser ligada:
 
-```
-Helooowww world eng. Computacional!!!!!!!
-```
+1. carregue um **driver de kernel próprio** para o sensor ultrassônico HC-SR04, que expõe a
+   medição em `/dev/hcsr04`, em milímetros;
+2. suba uma **rede Wi-Fi própria**, em modo Access Point, com SSID `TP9-GRUPO03` e endereço
+   `192.168.50.1`;
+3. inicie o **Docker** e um **container** com a aplicação Flask, recebendo o device por `--device`;
+4. sirva um **dashboard** em `http://192.168.50.1` que mostra a distância em tempo real,
+   atualizando a cada 500 ms.
 
-Tudo isso **sem nenhum comando manual** após o boot e **sem acesso à internet**: a imagem do
-container viaja dentro do cartão.
+Tudo **sem nenhum comando manual** após o boot e **sem acesso à internet**: a imagem do container
+viaja dentro do cartão, e o dashboard não busca nada de fora.
+
+O caminho completo — do eco ultrassônico até o número na tela — está em
+[docs/arquitetura.md](docs/arquitetura.md).
 
 ## Hardware utilizado
 
@@ -31,10 +35,15 @@ container viaja dentro do cartão.
 |---|---|
 | Placa | Raspberry Pi 4 Model B |
 | SoC | Broadcom BCM2711, Cortex-A72 quad-core, AArch64 |
+| Wi-Fi | Broadcom BCM43455, onboard, via SDIO |
+| Sensor | HC-SR04 (ultrassônico, 5 V), em protoboard |
+| Adequação de nível | divisor resistivo 1 kΩ / 2 kΩ no pino ECHO — **obrigatório** |
 | Armazenamento | cartão microSD (mínimo 2 GB; a imagem ocupa 1,1 GB) |
-| Rede | Ethernet (`eth0`) ligada ao mesmo roteador do notebook, com DHCP |
-| Console | monitor HDMI e teclado USB (o banner e o login são evidência visual) |
+| Console | monitor HDMI e teclado USB |
+| Cliente | notebook ou celular, para conectar ao Wi-Fi da placa |
 | Host de build | PC x86_64 com Linux, ~30 GB livres, Docker e emulação ARM64 |
+
+A ligação pino a pino e o cálculo do divisor estão em [docs/hardware.md](docs/hardware.md).
 
 ## Versões
 
@@ -43,83 +52,130 @@ container viaja dentro do cartão.
 | Buildroot | **2026.08.1** |
 | Defconfig base | `raspberrypi4_64_defconfig` |
 | Arquitetura | AArch64 (Cortex-A72), toolchain externa Bootlin glibc |
-| Kernel | Raspberry Pi Linux (`bcm2711_defconfig`) + `linux-docker.fragment` |
+| Kernel | Raspberry Pi Linux 6.12.61 (`bcm2711_defconfig`) + `linux-docker.fragment` |
 | Init | BusyBox init (SysV) |
+| Driver | `hcsr04`, deste projeto, compilado como módulo externo |
+| Wi-Fi AP | hostapd 2.12 · dnsmasq 2.93 · iw 6.17 |
+| Firmware | linux-firmware 20260810 · wireless-regdb 2026.09.03 |
 | Docker | docker-engine 28.5.2 + docker-cli 28.5.2 (pacotes Buildroot) |
-| Container | `flask-tp:1.0` · `linux/arm64` · base `python:3.12.15-slim-bookworm` |
+| Container | `tp-distance:1.0` · `linux/arm64` · base `python:3.12.15-slim-bookworm` |
 | Aplicação | Flask 3.1.3 sobre Python 3.12 |
-| Rootfs | ext4, 1024 MB |
+| Rootfs | ext4, 1024 MB (269 MB ocupados) |
 
 ## Arquitetura do sistema
 
-![Arquitetura do sistema](docs/imagens/01-arquitetura.png)
+![Arquitetura do sistema](docs/imagens/arquitetura.png)
 
-O notebook acessa a aplicação pelo **IP da Raspberry** na porta 5000. O `iptables` que o Docker
-gerencia reescreve o destino do pacote (DNAT) para o IP interno do container, na faixa
-`172.17.0.0/16` da bridge `docker0`, que não existe fora da placa. A explicação completa está em
-[docs/05-rede.md](docs/05-rede.md).
+```
+HC-SR04 → GPIO23/24 → driver hcsr04 → /dev/hcsr04 → --device → Flask → navegador
+                                                                  ↑
+                                                         Wi-Fi AP 192.168.50.1
+```
 
-A sequência de boot está em [docs/imagens/02-boot.png](docs/imagens/02-boot.png) e detalhada em
-[docs/01-arquitetura.md](docs/01-arquitetura.md).
+O cliente conecta ao SSID da própria placa e acessa `http://192.168.50.1`. O `iptables` que o
+Docker gerencia reescreve o destino (DNAT) da porta 80 da Raspberry para o IP interno do container
+na bridge `docker0`, que não existe fora da placa.
+
+A sequência de boot está em [docs/imagens/boot.png](docs/imagens/boot.png).
 
 ## Documentação técnica
 
 | Documento | Assunto |
 |---|---|
-| [docs/01-arquitetura.md](docs/01-arquitetura.md) | camadas do sistema, boot, decisões estruturais |
-| [docs/02-buildroot.md](docs/02-buildroot.md) | cada opção do Buildroot: símbolo, motivo, dependências, impacto |
-| [docs/03-linux.md](docs/03-linux.md) | fragment de kernel para containers |
-| [docs/04-docker.md](docs/04-docker.md) | Docker na imagem e inicialização automática |
-| [docs/05-rede.md](docs/05-rede.md) | `docker0`, bridge, veth, `-p 5000:5000` |
-| [docs/06-compilacao.md](docs/06-compilacao.md) | reconstrução do zero, tempos, conferências |
-| [docs/07-testes.md](docs/07-testes.md) | procedimento de teste e evidências |
+| [docs/arquitetura.md](docs/arquitetura.md) | camadas, caminho da medição, boot, decisões estruturais |
+| [docs/hardware.md](docs/hardware.md) | ligação do HC-SR04, divisor do ECHO, escolha dos GPIOs |
+| [docs/driver.md](docs/driver.md) | algoritmo do driver, Device Tree, integração ao Buildroot |
+| [docs/buildroot.md](docs/buildroot.md) | cada opção: símbolo, motivo, dependências, impacto; kernel |
+| [docs/wifi-ap.md](docs/wifi-ap.md) | hostapd, dnsmasq, firmware do Wi-Fi, IP e DHCP |
+| [docs/docker-web.md](docs/docker-web.md) | Docker, `--device`, rede, API e dashboard |
+| [docs/compilacao.md](docs/compilacao.md) | reconstrução do zero, tempos, conferências |
+| [docs/testes.md](docs/testes.md) | o que está conferido, o que falta validar, evidências |
+
+### Onde está cada item exigido
+
+A seção 13 do enunciado lista a documentação obrigatória. Esta tabela diz onde cada item está:
+
+| Item exigido | Onde |
+|---|---|
+| Integrantes e RAs | este README, no topo |
+| Versão do Buildroot | este README, em *Versões* |
+| Diagrama completo da arquitetura | [docs/arquitetura.md](docs/arquitetura.md) e `docs/imagens/` |
+| Esquema elétrico, com divisor do ECHO | [docs/hardware.md](docs/hardware.md) |
+| Justificativa de GPIO23 e GPIO24 | [docs/hardware.md](docs/hardware.md) |
+| Algoritmo do driver | [docs/driver.md](docs/driver.md) |
+| Device Tree e campo `compatible` | [docs/driver.md](docs/driver.md) |
+| `Config.in`, `.mk`, `Makefile`, `kernel-module` | [docs/driver.md](docs/driver.md) |
+| Opções do kernel e do Buildroot | [docs/buildroot.md](docs/buildroot.md) |
+| hostapd, dnsmasq, IP e DHCP | [docs/wifi-ap.md](docs/wifi-ap.md) |
+| Rede Docker e `--device` | [docs/docker-web.md](docs/docker-web.md) |
+| API do backend | [docs/docker-web.md](docs/docker-web.md) |
+| Fluxo de atualização do frontend | [docs/docker-web.md](docs/docker-web.md) |
+| Procedimento de compilação | [docs/compilacao.md](docs/compilacao.md) e abaixo |
+| Procedimento de gravação da imagem | abaixo, em *Gravação do microSD* |
+| Procedimento de teste | [docs/testes.md](docs/testes.md) |
+| Problemas encontrados e soluções | abaixo |
+| Hashes dos artefatos finais | [evidence/hashes.txt](evidence/hashes.txt) |
 
 ## Estrutura do repositório
 
 ```
-tp.env                                 parâmetros do grupo (hostname, usuário, senhas, integrantes)
-VERSION                                 identificação da versão entregue (gerado)
+tp.env                                  parâmetros do grupo (hostname, usuário, senhas, integrantes)
+VERSION                                 identificação da versão (gerado)
 README.md                               este documento
 docs/                                   documentação técnica e diagramas
 buildroot-config/                       cópia da defconfig (gerada) + README
-evidence/                               evidências da validação
-├── login/ docker/ network/ web/        capturas da Raspberry e do navegador
+flask-app/                              aplicação
+├── app.py                              API /api/distance e dashboard
+├── templates/index.html                frontend, tudo embutido
+└── Dockerfile · requirements.txt       imagem arm64
+scripts/                                automação do build (00 a 05 + lib.sh)
+evidence/                               evidências
+├── hardware/ login/ driver/            capturas da placa
+├── network/ docker/ web/ reboot/
 ├── build/                              conferências feitas pelos scripts no host
 └── hashes.txt                          SHA-256 dos artefatos do último build
 br2-external/                           árvore BR2_EXTERNAL (name: TP)
 ├── external.desc · Config.in · external.mk
-├── configs/tp_rpi4_defconfig          configuração Buildroot do TP (canônica)
+├── configs/tp_rpi4_defconfig           configuração Buildroot do TP (canônica)
+├── package/hcsr04-driver/              pacote do driver: Config.in, .mk, src/
 └── board/tp/rpi4/
     ├── buildroot.fragment              opções do TP sobre a defconfig da Pi
     ├── identidade.fragment             hostname e senha de root (gerado do tp.env)
-    ├── linux-docker.fragment           opções de kernel para containers
     ├── users_table.txt                 usuário do projeto (gerado do tp.env)
+    ├── linux-docker.fragment           opções de kernel para containers
+    ├── hcsr04-overlay.dts · .dtbo      Device Tree do sensor
+    ├── config_tp.txt                   config.txt da partição de boot
+    ├── post-build.sh · post-image.sh   ajustes no rootfs e na partição de boot
     └── rootfs-overlay/
         ├── etc/issue                   banner exibido antes do login
-        ├── etc/init.d/S99flask-tp     sobe o container no boot
         ├── etc/network/interfaces      eth0 por DHCP
-        ├── opt/docker/                 recebe o flask-tp.tar (fora do Git)
-        └── usr/bin/tp-evidencias      coleta as evidências na própria Pi
-flask-app/                              aplicação e Dockerfile
-scripts/                                automação do build (00 a 05 + lib.sh)
+        ├── etc/hostapd.conf            SSID, canal e WPA2 do Access Point
+        ├── etc/dnsmasq.conf            faixa DHCP entregue aos clientes
+        ├── etc/modules-load.d/tp.conf  módulos carregados no boot
+        ├── etc/init.d/S55hcsr04        prepara o /dev/hcsr04
+        ├── etc/init.d/S70tp-ap         wlan0, hostapd e dnsmasq
+        ├── etc/init.d/S99tp-app        sobe o container
+        ├── usr/bin/tp-evidencias       coleta as evidências na própria Pi
+        └── opt/docker/                 recebe o tp-distance.tar (fora do Git)
 ```
 
 A organização difere do esqueleto sugerido no enunciado em dois pontos, ambos permitidos pela
-cláusula de adaptação: o board fica em `board/tp/rpi4/` e o overlay chama-se `rootfs-overlay/`,
-que são os caminhos usados pelo guia da Aula 10; e os scripts são seis em vez de três, um por
-etapa do processo.
+cláusula de adaptação: a árvore externa chama-se `br2-external/` e não `br2-external-tp9/`, com o
+board em `board/tp/rpi4/`; e os scripts são seis, um por etapa. O motivo de a nomenclatura não
+levar o número do TP está em [docs/arquitetura.md](docs/arquitetura.md).
 
 ### O que não é versionado
 
 | Fora do Git | Motivo |
 |---|---|
 | `buildroot/`, `output-rpi4/`, `*.img` | artefatos de build, reconstruídos pelos scripts |
-| `flask-tp.tar` (48 MB) | artefato de build; o que o define (`Dockerfile`, `app.py`, `requirements.txt`) está versionado |
+| `tp-distance.tar` (48 MB) | artefato de build; o que o define (`Dockerfile`, `app.py`, `templates/`, `requirements.txt`) está versionado |
+| `.o`, `.ko` e dependências dentro do pacote do driver | o build out-of-tree do kernel os grava ao lado do fonte |
 
 O SHA-256 dos artefatos fica em [evidence/hashes.txt](evidence/hashes.txt). Esse arquivo é
 reescrito pelos scripts a cada build, então descreve **o último build feito neste repositório**.
-Os hashes da imagem efetivamente entregue no TP 8 estão preservados na branch `entrega-tp8` e na
-tag `tp8-final` — veja "Versão final entregue", no fim deste README.
+Os hashes da imagem entregue no TP 8 estão preservados na branch `entrega-tp8` e na tag
+`tp8-final` — veja "Entrega anterior", no fim deste README.
 
 Build de Docker não é reprodutível byte a byte, então o hash identifica **aquele** artefato, não
 valida uma reconstrução.
@@ -143,13 +199,16 @@ Depois de editar, `./scripts/02-configure.sh` regenera o `/etc/issue`, o `users_
 `identidade.fragment`, o `VERSION` e a defconfig — e falha se recarregar a defconfig salva não
 reproduzir o mesmo `.config`.
 
+O SSID, a senha do Wi-Fi e a faixa DHCP ficam em `rootfs-overlay/etc/hostapd.conf` e
+`etc/dnsmasq.conf`; o `02` confere que as linhas obrigatórias continuam lá.
+
 ## Procedimento de compilação
 
 ```bash
 ./scripts/00-setup-host.sh        # dependências, Docker, buildx, emulação arm64 (usa sudo)
 ./scripts/01-fetch-buildroot.sh   # Buildroot 2026.08.1 em ./buildroot
 ./scripts/02-configure.sh         # gera e salva br2-external/configs/tp_rpi4_defconfig
-./scripts/03-build-flask-image.sh # imagem arm64 → rootfs-overlay/opt/docker/flask-tp.tar
+./scripts/03-build-flask-image.sh # imagem arm64 → rootfs-overlay/opt/docker/tp-distance.tar
 ./scripts/04-build-image.sh       # make → output-rpi4/images/sdcard.img
 ```
 
@@ -162,10 +221,10 @@ make O=../output-rpi4 BR2_EXTERNAL=../br2-external tp_rpi4_defconfig
 make O=../output-rpi4 BR2_EXTERNAL=../br2-external -j$(nproc)
 ```
 
-Primeiro build: cerca de 30 minutos em 20 núcleos. Rebuild incremental após mudar o overlay: menos
-de um minuto. Detalhes em [docs/06-compilacao.md](docs/06-compilacao.md).
+Primeiro build: cerca de 30 minutos em 20 núcleos. Rebuild incremental: menos de um minuto.
+Detalhes em [docs/compilacao.md](docs/compilacao.md).
 
-## Procedimento de gravação do microSD
+## Gravação do microSD
 
 ```bash
 ./scripts/05-flash-sd.sh
@@ -173,17 +232,15 @@ de um minuto. Detalhes em [docs/06-compilacao.md](docs/06-compilacao.md).
 
 O script lista os discos, pede o nome do dispositivo, recusa o disco do sistema e qualquer
 dispositivo maior que 256 GB, exige a digitação do nome uma segunda vez e só então executa o `dd`.
-Também se recusa a gravar uma imagem que não contenha o tar do container.
+Também se recusa a gravar uma imagem que não contenha o tar do container, ou cujo hash não seja o
+registrado em `evidence/hashes.txt`.
+
+Depois de gravar, **lê o cartão de volta** e compara com a imagem, registrando o resultado em
+`evidence/build/cartao-gravado.txt`. É o que garante que o hash do commit descreve o cartão
+apresentado.
 
 Alternativa gráfica: Raspberry Pi Imager ou balenaEtcher, escolhendo `output-rpi4/images/sdcard.img`
 como imagem personalizada.
-
-Equivalente manual, para quem preferir:
-
-```bash
-sudo dd if=output-rpi4/images/sdcard.img of=/dev/sdX bs=4M status=progress conv=fsync
-sync
-```
 
 ## Usuário configurado
 
@@ -192,207 +249,138 @@ sync
 | `aluno` | `tpgrupo03` | `aluno`, `docker` | `users_table.txt` → `/etc/passwd`, `/etc/shadow` (SHA-256), `/etc/group` |
 | `root` | `123456` | — | `BR2_TARGET_GENERIC_ROOT_PASSWD` |
 
-Linha da users table:
-
-```
-aluno -2 aluno -2 =tpgrupo03 /home/aluno /bin/sh docker Aluno_TP_G03
-```
-
-O `-2` pede UID e GID automáticos na faixa de usuário comum (1000 em diante); o `=` indica senha em
-texto claro, que o `mkusers` converte em hash — aceitável apenas neste TP. Pertencer ao grupo
-`docker` é o que permite ao `aluno` usar a CLI sem `root`.
+Pertencer ao grupo `docker` é o que permite ao `aluno` usar a CLI sem `root`. O `=` na users table
+indica senha em texto claro, que o `mkusers` converte em hash — aceitável apenas neste TP.
 
 ## Como iniciar o sistema
 
-1. Cartão gravado no slot da Raspberry.
-2. Cabo Ethernet no mesmo roteador do notebook.
+1. Montar o circuito e **conferir a ligação antes de energizar** — 5 V no GPIO danifica a placa.
+2. Cartão gravado no slot da Raspberry.
 3. Monitor HDMI e teclado.
 4. Fonte de alimentação **por último**.
 
 Ao ligar, o banner do grupo aparece antes do `login:`. Entre com `aluno` / `tpgrupo03`.
 
 > **No primeiro boot, a tela fica parada por 1 a 2 minutos** na mensagem
-> `[TP] carregando imagem Docker`. É o `docker load` dos 48 MB do cartão, que acontece uma única
-> vez. Não desligue a placa nesse momento. Nos boots seguintes o login aparece normalmente.
+> `[TP] carregando imagem Docker`. É o `docker load` dos 48 MB, que acontece uma única vez.
+> Não desligue a placa nesse momento.
 
-## Como descobrir o IP da Raspberry
-
-```sh
-ip addr show eth0
-```
-
-O endereço aparece na linha `inet`, algo como `192.168.0.42/24`. Alternativas: `ip route`, ou a
-lista de clientes DHCP na interface do roteador. O `tp-evidencias` imprime a URL pronta ao final.
-
-## Como verificar o Docker
+## Como verificar cada camada
 
 ```sh
-docker version     # cliente e daemon respondendo
-docker info        # estado do daemon; avisos de kernel apareceriam aqui
-docker images      # flask-tp:1.0 deve estar listada
+# driver e sensor
+lsmod | grep hcsr04
+ls -l /dev/hcsr04
+cat /dev/hcsr04              # distância em milímetros
+
+# Wi-Fi AP
+ip addr show wlan0           # tem de mostrar 192.168.50.1
+hostapd_cli all_sta          # clientes associados
+
+# Docker e container
+docker ps                    # tp-distance "Up"
+docker inspect tp-distance   # device, publicação da porta, IP interno
+
+# aplicação, da própria placa
+curl http://127.0.0.1/api/distance
 ```
 
-## Como verificar o container
+Do cliente: conectar ao Wi-Fi **`TP9-GRUPO03`** (senha `embarcados2026`) e abrir
+**`http://192.168.50.1`**.
 
-```sh
-docker ps                      # flask-tp deve estar "Up"
-docker network ls              # a rede bridge (docker0)
-docker inspect flask-tp       # IP interno e publicação da porta
-docker logs flask-tp          # saída do Flask
-```
-
-## Como acessar a aplicação
-
-Na própria Raspberry:
-
-```sh
-curl http://127.0.0.1:5000
-```
-
-Do notebook, na mesma rede local, no navegador:
-
-```
-http://IP_DA_RASPBERRY:5000
-```
-
-Os dois devem exibir `Helooowww world eng. Computacional!!!!!!!`.
-
-## Procedimentos de teste
-
-Após o login, rode na placa:
-
-```sh
-tp-evidencias
-```
-
-Ele coleta `hostname`, `whoami`, `id`, `uname -a`, `/etc/issue`, `ip addr`, `ip route`,
-`docker version`, `docker info`, `docker images`, `docker ps -a`, `docker network ls`,
-`docker inspect flask-tp`, o SHA-256 do tar e o `curl` local, gravando tudo em
+O comando `tp-evidencias`, já instalado, roda quase toda essa lista de uma vez e grava em
 `~/evidencias-tp.txt`.
 
-**Teste de reinicialização:** três ciclos de `reboot`, sem executar nenhum comando Docker à mão. A
-cada boot, repetir `tp-evidencias` e o acesso pelo navegador. O arquivo acumula as execuções. O
-objetivo é comprovar que o serviço e o container voltam sozinhos.
-
-Procedimento completo e tabela de diagnóstico por sintoma em [docs/07-testes.md](docs/07-testes.md).
+> A rede do AP **não tem internet** — não há NAT, de propósito. Um celular com dados móveis
+> ligados pode sair da rede por isso. Use o notebook, ou desligue os dados móveis antes.
 
 ## Evidências
 
-O sistema foi validado na Raspberry Pi 4 física. Registrado em [evidence/](evidence/):
+**O sistema ainda não foi validado em hardware.** O que existe hoje é verificação de build: cada
+camada é conferida automaticamente no host a cada compilação, lendo o artefato real. O que isso
+cobre, e o que só a placa demonstra, está separado em [docs/testes.md](docs/testes.md), junto com a
+lista das doze evidências a coletar e o nome do arquivo de cada uma.
 
-| Arquivo | O que comprova |
-|---|---|
-| `login/01-banner-login.jpg` | banner do grupo exibido antes do login, e o Docker criando a rede do container ainda durante o boot |
-| `login/02-hostname-whoami-ip.jpg` | `hostname`, `whoami` e o endereço obtido por DHCP na `eth0` |
-| `login/03-banner-login-completo.jpg` | banner, login e teste local na mesma tela |
-| `network/04-curl-local.jpg` | aplicação respondendo a mensagem exigida na própria placa |
-| `network/05-curl-local-detalhe.jpg` | segundo registro do teste local |
-
-Os SHA-256 do último build estão em [evidence/hashes.txt](evidence/hashes.txt) — os da entrega do
-TP 8, na branch `entrega-tp8` — e as conferências que os scripts fazem no host, em
-[evidence/build/](evidence/build/):
+As conferências automáticas ficam em [evidence/build/](evidence/build/):
 
 - [usuarios-na-imagem.txt](evidence/build/usuarios-na-imagem.txt) — `/etc/passwd` e `/etc/group`
   lidos de dentro do `rootfs.ext4` com `debugfs`;
 - [kernel-check-config.txt](evidence/build/kernel-check-config.txt) — o `check-config.sh` do
-  próprio Docker rodado contra o `.config` do kernel gerado.
+  próprio Docker rodado contra o `.config` do kernel gerado;
+- [boot-na-imagem.txt](evidence/build/boot-na-imagem.txt) — a sequência de scripts de init, os
+  módulos carregados no boot e o `docker run` do container, lidos da imagem.
 
 ## Problemas encontrados e soluções adotadas
 
-### Previstos e tratados desde o início
+### No guia do TP, que não funcionariam nesta configuração
+
+| Problema | Solução |
+|---|---|
+| O guia manda copiar `config_4.txt` para o `config.txt` da partição de boot, que é a variante de **32 bits**: a imagem não daria boot | copiamos `config_4_64bit.txt`, com `kernel=Image` e `arm_64bit=1`; o `02` confere as três linhas obrigatórias |
+| O `/etc/network/interfaces` do guia **apaga a `eth0`** e declara `auto wlan0`, o que faz o `ifup` falhar no boot, porque a interface só existe depois de o firmware carregar | a `wlan0` é configurada pelo `S70tp-ap`, como o próprio script do guia faz; a `eth0` continua por DHCP |
+| O guia não menciona carregar o `brcmfmac` nem o `hcsr04`. Sem `mdev`/`eudev` ninguém trata o uevent, e nem a `wlan0` nem o `/dev/hcsr04` existiriam | os dois módulos entram em `/etc/modules-load.d/tp.conf`, carregado pelo `S11modules` |
+| O pacote `dnsmasq` instala um `S80dnsmasq` próprio, que subiria uma segunda instância | um `post-build.sh` do TP remove o script; quem sobe o AP inteiro é o `S70tp-ap` |
+| O `COPY templates` do Dockerfile do guia não funcionaria: o `.dockerignore` do projeto é uma lista de exceções | `templates/` liberado explicitamente |
+
+### Encontrados em revisão, antes de quebrarem
+
+Todos só apareceriam com a placa na mesa, depois de horas de build.
+
+| Problema | Solução |
+|---|---|
+| O `.dtbo` não chegava à partição de boot: `BR2_PACKAGE_RPI_FIRMWARE_EXTRA_FILES` instala na raiz de `rpi-firmware/`, mas o firmware procura em `overlays/` | `post-image.sh` próprio, listado **antes** do da Raspberry, que é quem chama o `genimage` |
+| Mudar `BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE` **não** reinstala o pacote: o `config.txt` da imagem ficou sem o `dtoverlay=hcsr04`, com o build terminando em sucesso | o `04` confere as linhas dentro da imagem, e a mensagem de erro ensina o `rpi-firmware-reinstall` |
+| O firmware do Wi-Fi chega por symlink que o pacote só cria **se o alvo existir, em silêncio se não** | o `04` testa com `test -f`, que segue o link |
+| O submódulo de fabricante do BCM43455 é o `brcmfmac-wcc`, não o `cyw` — a primeira versão da conferência guardava o módulo errado | corrigido conferindo a tabela SDIO no fonte do kernel |
+| Uma conferência do `04` passava mesmo com o defeito presente: o `grep` casava com a palavra dentro de um comentário do próprio script | o `grep` passou a ignorar comentários; descoberto ao **sabotar** a conferência e vê-la não falhar |
+| Um container criado por uma imagem anterior seria reaproveitado com as opções antigas, sem o `--device` | o `S99tp-app` confere o device do container existente e recria se faltar |
+| O rename do container deixaria um tar de 48 MB esquecido dentro da imagem, carregado junto no boot | o `04` exige que `/opt/docker` contenha exatamente o tar atual e o LEIA-ME |
+
+### Herdados do TP anterior, já tratados
 
 | Problema | Solução |
 |---|---|
 | rootfs padrão da Pi tem 120 MB, insuficiente para Docker | `BR2_TARGET_ROOTFS_EXT2_SIZE="1024M"` |
-| Host x86_64 geraria imagem amd64 → `exec format error` na Pi | `docker buildx --platform linux/arm64` e checagem de `arm64/linux` no script 03 |
+| Host x86_64 geraria imagem amd64 → `exec format error` na Pi | `docker buildx --platform linux/arm64` e checagem de `arm64/linux` no `03` |
 | O `S99` podia rodar antes de o `dockerd` responder | laço de espera em `docker info`, até 60 tentativas |
-| Arquivos editados com CRLF quebram scripts `#!/bin/sh` | o script 02 normaliza finais de linha e permissões antes do build |
-
-### Falharam na prática, no host do grupo
-
-| Problema | Solução |
-|---|---|
-| O `00-setup-host.sh` era só `apt-get` e morria no host Arch do grupo | passou a detectar `apt-get`/`pacman`; no Arch instala `base-devel` e `docker-buildx` e ativa o `docker.service`, que lá não vem habilitado |
-| A árvore extraída do Buildroot não casava com o caminho esperado pelos scripts | pasta padronizada como `buildroot/` e versão fixada no `tp.env` |
-
-### Encontrados em revisão, antes de quebrarem
-
-Todos eram falhas que só apareceriam com a Raspberry na mesa, depois de horas de build.
-
-| Problema | Solução |
-|---|---|
-| O `/etc/network/interfaces` do overlay estava incompleto e, por ser copiado depois dos pacotes, sobrescrevia o arquivo gerado — perdendo a espera pelo link da `eth0`, que sem ela pode ficar sem IP no boot | o arquivo do overlay passou a conter as diretivas completas, e o script 04 confere a espera na imagem final |
-| A conferência do usuário era feita num diretório intermediário do build, onde ele nunca aparece | passou a ser feita na imagem gerada, que é o artefato real |
-| A imagem do container podia sair num formato que a Raspberry não carrega | o script 03 confere a arquitetura e o formato do arquivo exportado antes de seguir |
-| Um recurso de kernel exigido pelo Docker podia ficar de fora sem aviso | o script 04 roda a verificação que o próprio Docker distribui e falha se faltar algo obrigatório |
-| Nada verificava se sobrava espaço no rootfs para carregar o container no primeiro boot | o script 04 compara o espaço livre com o tamanho da imagem do container |
+| O `/etc/network/interfaces` do overlay sobrescrevia o gerado, perdendo a espera pelo link da `eth0` | o arquivo do overlay contém as diretivas completas, e o `04` confere a espera na imagem |
 
 ## Limitações conhecidas
 
-- **Acesso de outro equipamento não registrado.** Na rede onde a placa foi validada, a faixa do
-  cabo e a do Wi-Fi são sub-redes isoladas entre si, então nenhum outro aparelho disponível no
-  momento alcançava a Raspberry. A aplicação responde na própria placa, e a porta está publicada
-  pelo Docker; o que falta é a captura feita de fora.
-- **Nem todas as saídas de comando foram fotografadas.** As evidências registradas estão em
-  `evidence/`; as demais constam dos procedimentos de teste e podem ser reproduzidas com a placa
-  ligada.
-- **Senhas em texto claro** no `tp.env` e, por consequência, no repositório. Aceitável apenas
-  neste TP, como o próprio enunciado indica; um produto real usaria hash e provisionamento.
-- **A interface `eth0` aparece em dois lugares** — no `BR2_SYSTEM_DHCP` e escrita à mão no
-  `interfaces` do overlay. Hoje concordam, mas trocar só um dos dois não teria efeito, porque o
-  overlay sobrescreve.
-- **O `BR2_TARGET_GENERIC_ISSUE` é inerte.** O banner real vem do overlay, que é copiado depois. A
-  variável é mantida porque o enunciado pede o hostname e o issue configurados no `menuconfig`.
-- **Build de Docker não é reprodutível byte a byte**, então reconstruir o projeto gera uma imagem
-  funcionalmente equivalente, mas com outro SHA-256.
+- **Validação em hardware pendente.** Ver [docs/testes.md](docs/testes.md).
+- **A rede do AP não tem internet.** Não há NAT entre `wlan0` e `eth0`: o produto é autônomo. Um
+  cliente com dados móveis pode preferir a rede celular.
+- **Sem `country_code` no hostapd.** O `brcmfmac` gerencia o domínio regulatório pelo firmware, e
+  um valor recusado abortaria o `hostapd`. O canal 6 é válido em qualquer domínio, e a
+  `regulatory.db` está na imagem para ajuste no dia.
+- **Sem compensação de temperatura** no cálculo da distância.
+- **Senhas em texto claro** no `tp.env` e nos arquivos de configuração. Aceitável apenas neste TP;
+  um produto real usaria hash e provisionamento.
+- **O `BR2_TARGET_GENERIC_ISSUE` é inerte.** O banner real vem do overlay, copiado depois. A
+  variável é mantida porque o enunciado pede o issue configurado no `menuconfig`.
+- **Build de Docker não é reprodutível byte a byte**, e o hash do `sdcard.img` muda a cada build,
+  porque timestamps do ext4 e da vfat entram na imagem.
 - **O primeiro boot é lento** e aparenta travamento durante o `docker load`.
-- **Não há compilador no alvo.** Incluir o Go foi cogitado e descartado: a instalação ocupa 313 MB,
-  contra 258 MB que o sistema inteiro usa hoje. Programas para esta placa devem ser compilados de
-  forma cruzada no PC, com alvo AArch64 / Cortex-A72. O raciocínio completo está em
-  [docs/02-buildroot.md](docs/02-buildroot.md).
+- **Não há compilador no alvo.** O raciocínio está em [docs/buildroot.md](docs/buildroot.md).
 
-## Versão final entregue
+## Entrega anterior (TP 8)
 
-Os valores abaixo descrevem a imagem efetivamente gravada e apresentada. O repositório daquele
-momento está inteiro na branch `entrega-tp8` e na tag `tp8-final`: a branch existe para que o
-estado da entrega possa ser navegado direto no GitHub, e o desenvolvimento segue na `main`. Os
-nomes com `tp8` são os daquele momento — a nomenclatura do projeto passou depois a ser só `tp`,
-sem número, para não precisar ser renomeada a cada entrega.
-
-> **Atenção a quem baixar a imagem do Release:** ela é anterior ao rename e só aceita a senha
-> `tp8grupo03`, abaixo. Uma imagem compilada do estado atual do repositório usa `tpgrupo03`.
-
-| Item | Valor |
-|---|---|
-| Versão do projeto | 1.0 |
-| Branch na entrega | `main`, preservada em `entrega-tp8` |
-| Tag | `tp8-final` |
-| Buildroot | 2026.08.1 |
-| Hostname | `rpi4-tp8-g03` |
-| Usuário | `aluno` |
-| Senha | `tp8grupo03` |
-| URL esperada | `http://IP_DA_RASPBERRY:5000` |
-| SHA-256 do `flask-tp8.tar` | `a95183335b829030b610fd6bbd9cef293ebe80f4e2962cceea5fba7eba3e99a6` |
-| SHA-256 do `sdcard.img` | `ba2485d8759abef375e43975ec23b5e63de7f1077d2f83cd276f03c030cfab13` |
-
-O arquivo [VERSION](VERSION) é gerado a partir do `tp.env` e reflete a configuração **atual** do
-repositório, já com a nomenclatura `tp`. A tabela acima é o registro da entrega do TP 8 e por isso
-guarda os nomes antigos.
-
-Para conferir a imagem do Release contra o registro original, sem depender do estado atual do
-repositório:
+O repositório é uma base contínua. O estado da entrega do TP 8 — imagem Buildroot + Docker + Flask,
+sem sensor e sem Wi-Fi — está preservado na branch **`entrega-tp8`** e na tag **`tp8-final`**, com
+a imagem publicada no Release. Para conferir aquela imagem contra o registro original:
 
 ```sh
 # o arquivo compactado, como o GitHub o publica:
 #   4112427bc460e90b2f885078942d155432e05a1e909087e3c70cf17ea6890db8
 sha256sum tp8-sdcard.img.gz
 
-# a imagem em si, que é o valor registrado na tabela acima:
+# a imagem em si:
+#   ba2485d8759abef375e43975ec23b5e63de7f1077d2f83cd276f03c030cfab13
 gunzip -c tp8-sdcard.img.gz | sha256sum
 
 # o registro como estava na entrega:
 git show entrega-tp8:evidence/hashes.txt
 ```
 
-O `evidence/hashes.txt` da `main` **não** serve para essa conferência: os scripts o reescrevem a
-cada build, e hoje ele descreve um build posterior à entrega.
+Aquela imagem é anterior ao rename da nomenclatura e só aceita a senha `tp8grupo03`; a atual usa
+`tpgrupo03`.

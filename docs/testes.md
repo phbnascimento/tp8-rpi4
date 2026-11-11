@@ -1,76 +1,124 @@
-# 07 — Testes e evidências
+# Testes e evidências
 
-## Estado da validação
+## O que está conferido e o que não está
 
-| Verificação | Situação |
+O sistema foi construído sem acesso à Raspberry. Em compensação, **cada camada tem uma conferência
+automática no host**, executada a cada build: o `scripts/04-build-image.sh` recusa a imagem se
+alguma falhar. Isso prova que os arquivos certos estão na imagem e que os formatos batem — não
+prova que o sensor mede, que o rádio associa ou que o container volta depois de reiniciar.
+
+As duas colunas abaixo são a divisão honesta entre as duas coisas.
+
+### Conferido no host
+
+| Verificação | Como |
 |---|---|
-| Conteúdo da imagem conferido com `debugfs` | **feito** — usuário, grupo, banner, rede, scripts de init, tar do container |
-| Kernel aprovado no `check-config.sh` do Docker | **feito** — nenhuma opção obrigatória ausente |
-| Container responde a frase exigida (emulado no host) | **feito** — testado pelo `scripts/03` |
-| Arquitetura `arm64/linux` da imagem do container | **feito** |
-| Boot na Raspberry Pi 4 física | **pendente** |
-| Três ciclos de reboot | **pendente** |
-| Capturas de tela e do navegador | **pendente** |
+| conteúdo do rootfs: usuário, grupo `docker`, banner, `wait-delay` da rede, scripts de init | lido de dentro do `rootfs.ext4` com `debugfs`, sem montar a imagem |
+| modo `0755` dos quatro executáveis do TP | idem, dentro da imagem |
+| kernel com tudo que o Docker exige | `check-config.sh` do próprio Docker contra o `.config` gerado |
+| kernel com `MODULES`, `GPIOLIB`, `OF`, `DEVTMPFS_MOUNT`, `CFG80211`, `MAC80211`, `BRCMFMAC` | `grep` no `.config` da imagem |
+| `hcsr04.ko` instalado, em `modules.dep`, com `vermagic` igual ao kernel da imagem | `objcopy` na seção `.modinfo` do módulo |
+| `hcsr04.dtbo` corresponde ao `.dts` e chegou a `overlays/` na partição de boot | recompila o `.dts` e compara os bytes |
+| `config.txt` da imagem com `kernel=Image`, `arm_64bit=1` e `dtoverlay=hcsr04` | lido da partição de boot |
+| firmware do BCM43455 presente, com o symlink resolvendo | `test -f`, que segue o link |
+| `hostapd.conf` e `dnsmasq.conf` aceitos pelos **binários aarch64 da própria imagem** | executados no PC por binfmt/qemu |
+| SSID, faixa DHCP, tamanho da senha WPA2 | `grep` nos arquivos de configuração |
+| um único script `S99`, com `--device` e porta 80 | `grep` no rootfs, ignorando comentários |
+| `/opt/docker` com exatamente o tar atual e o LEIA-ME | listagem do diretório na imagem |
+| o tar contém a imagem `tp-distance:1.0` | `manifest.json` de dentro do tar |
+| a API responde certo, com e sem o device | container **emulado** no PC, com um arquivo montado em `/dev/hcsr04` |
+| o dashboard atualiza a cada 500 ms | Firefox headless contra o container, requisições contadas no log do Flask |
+| a imagem gravada no cartão é idêntica à imagem em disco | `scripts/05-flash-sd.sh` lê o cartão de volta e compara |
 
-As quatro primeiras linhas são inspeção estática do artefato: provam que os arquivos corretos estão
-na imagem. Não provam que o `dockerd` sobe, que o `docker load` conclui no primeiro boot nem que o
-container volta depois de reiniciar — isso só o hardware demonstra.
+As conferências **acrescentadas neste TP** foram testadas falhando: sabotamos o arquivo
+correspondente e confirmamos que o script aborta com a mensagem certa — SSID trocado, senha WPA2
+curta, módulo fora do `modules-load.d`, firmware ausente, `.conf` inválido, dois scripts `S99`,
+container sem `--device`, script de init duplicado, modo errado, opção de kernel ausente, tar
+antigo esquecido. As herdadas do TP anterior (usuário, banner, `wait-delay`, `check-config.sh`)
+vêm de lá e não foram sabotadas de novo.
 
-## Procedimento de teste na placa
+Uma verificação que nunca falhou não prova nada — foi exatamente assim que descobrimos uma das
+novas que passava mesmo com o defeito presente.
 
-1. Gravar o cartão com `./scripts/05-flash-sd.sh`.
-2. Montar: microSD → cabo Ethernet no mesmo roteador do notebook → monitor e teclado → fonte por
-   último.
-3. Aguardar o boot. **No primeiro boot a tela fica parada por 1 a 2 minutos** na mensagem
-   `[TP] carregando imagem Docker`: é o `docker load` dos 48 MB. Não desligar a placa nesse
-   momento.
-4. Conferir o banner do grupo antes do `login:`.
-5. Entrar com o usuário do `tp.env` (`aluno`).
-6. Rodar `tp-evidencias`, que grava em `~/evidencias-tp.txt` e mostra na tela.
-7. Anotar o IP da placa e abrir `http://IP_DA_RASPBERRY:5000` no navegador do notebook.
-8. `reboot`. Repetir os passos 5 a 7 mais duas vezes, **sem rodar nenhum comando Docker à mão**.
-   O arquivo de evidências acumula as execuções.
+### A validar na placa
 
-O objetivo dos três ciclos é demonstrar que o serviço e o container voltam sozinhos. Qualquer
-`docker run` manual invalida o teste.
+Nada abaixo foi executado ainda. É o que a apresentação demonstra.
 
-## Comandos de verificação
-
-| Comando | O que prova |
+| Item | Como se demonstra |
 |---|---|
-| `hostname` / `whoami` | hostname e usuário configurados no build |
-| `ip addr show eth0` | a placa recebeu IP do DHCP |
-| `docker version` | cliente e daemon respondendo |
-| `docker info` | daemon saudável; avisos de kernel apareceriam aqui |
-| `docker images` | a imagem foi carregada do tar |
-| `docker ps` | o container está em execução |
-| `docker network ls` | a rede `bridge` (docker0) existe |
-| `docker inspect flask-tp` | IP interno do container e a publicação da porta |
-| `curl http://127.0.0.1:5000` | a aplicação responde na própria placa |
-| `sha256sum /opt/docker/flask-tp.tar` | o tar embarcado é o mesmo que foi entregue |
+| boot e login | ligar a placa e entrar como `aluno` |
+| driver carregado | `lsmod`, `/dev/hcsr04` existindo |
+| medição real | `cat /dev/hcsr04` com objeto a distâncias diferentes |
+| AP no ar | SSID visível, cliente associando, DHCP entregando endereço |
+| container ativo | `docker ps` depois do boot, sem comando manual |
+| dashboard | `http://192.168.50.1` no cliente, número acompanhando o objeto |
+| persistência | tudo igual depois de `reboot`, sem intervenção |
 
-O `/usr/bin/tp-evidencias` automatiza a lista inteira: basta logar e digitar o nome dele. A saída
-vai para a tela e é acrescentada a `~/evidencias-tp.txt`, de modo que os três boots ficam no mesmo
-arquivo, cada um com o seu `boot_id` e o seu uptime no cabeçalho.
+## Procedimento de validação
+
+A sequência é a da seção 15 do enunciado — o professor pode executá-la com a placa partindo do
+estado desligado.
+
+1. **Montar o circuito** conforme [hardware.md](hardware.md) e **conferir a ligação antes de
+   energizar**. O ECHO tem de passar pelo divisor resistivo.
+2. Gravar o cartão com `./scripts/05-flash-sd.sh`, que confere a gravação lendo o cartão de volta.
+3. Ligar: microSD → sensor → monitor e teclado → fonte por último.
+4. Confirmar o banner do grupo antes do `login:` e entrar como `aluno`.
+   **No primeiro boot a tela fica parada por 1 a 2 minutos** na mensagem
+   `[TP] carregando imagem Docker`: é o `docker load` dos 48 MB. Não desligar.
+5. Confirmar o driver: `lsmod | grep hcsr04` e `ls -l /dev/hcsr04`.
+6. Ler o sensor na própria placa: `cat /dev/hcsr04`, com um objeto a uns 20 cm, e de novo a uns
+   60 cm. Os números têm de mudar.
+7. Confirmar o AP: `ip addr show wlan0` mostrando `192.168.50.1`.
+8. No celular ou notebook, procurar o SSID **`TP9-GRUPO03`**, conectar com a senha
+   `embarcados2026` e confirmar que recebeu um endereço `192.168.50.x`.
+9. Abrir **`http://192.168.50.1`** no cliente. O número aparece e acompanha o objeto.
+10. Na placa: `docker ps` e `docker inspect tp-distance`.
+11. `reboot` e repetir os passos 4 a 10 **sem rodar nenhum comando Docker à mão**. É isso que
+    demonstra que o sistema é autônomo; qualquer `docker run` manual invalida o teste.
+
+O comando `tp-evidencias`, já instalado, roda de uma vez quase toda a coleta: hostname, usuário,
+`ip addr` das duas interfaces, `lsmod`, `ls -l /dev/hcsr04`, `cat /dev/hcsr04`, estado do Docker e
+a resposta de `/api/distance`. A saída vai para a tela e é acrescentada a `~/evidencias-tp.txt`, de
+modo que os boots sucessivos ficam no mesmo arquivo, cada um com o seu `boot_id`.
+
+Para tirar o arquivo da placa: desligar, pôr o microSD no PC e copiar
+`/home/aluno/evidencias-tp.txt` da segunda partição.
 
 ## Evidências a coletar
 
-As dez evidências exigidas, e onde cada uma vai:
+As doze da seção 14 do enunciado, e onde cada uma vai. Mantenha o nome; ajuste só a extensão se a
+câmera gerar outro formato.
+
+| # | Evidência | Arquivo |
+|---|---|---|
+| 1 | foto da montagem elétrica, com o divisor visível | `evidence/hardware/01-montagem.jpg` |
+| 2 | banner e prompt de login | `evidence/login/02-banner-login.jpg` |
+| 3 | `lsmod` ou `modinfo` com o driver carregado | `evidence/driver/03-lsmod.jpg` |
+| 4 | `ls -l /dev/hcsr04` | `evidence/driver/04-ls-dev.jpg` |
+| 5 | `cat /dev/hcsr04` | `evidence/driver/05-cat-dev.jpg` |
+| 6 | `ip addr show wlan0` com `192.168.50.1` | `evidence/network/06-wlan0.jpg` |
+| 7 | cliente conectado ao SSID `TP9-GRUPO03` | `evidence/network/07-cliente-ssid.png` |
+| 8 | `docker ps` com o container ativo | `evidence/docker/08-docker-ps.jpg` |
+| 9 | resposta de `/api/distance` | `evidence/web/09-api-distance.png` |
+| 10 | dashboard exibindo a distância | `evidence/web/10-dashboard.png` |
+| 11 | duas distâncias físicas diferentes | `evidence/web/11a-distancia-perto.png` e `11b-distancia-longe.png` |
+| 12 | validação repetida após `reboot` | `evidence/reboot/12-apos-reboot.jpg` |
+
+Mais o que não é foto:
 
 | Arquivo | Conteúdo |
 |---|---|
-| `evidence/login/01-login.png` | foto da tela com o banner e o prompt de login |
-| `evidence/login/02-ip-raspberry.png` | saída de `hostname`, `whoami` e `ip addr show eth0` |
-| `evidence/docker/03-docker-running.png` | `docker version` e `docker info` |
-| `evidence/docker/04-container-running.png` | `docker images` e `docker ps` |
-| `evidence/network/05-docker-network.png` | `docker network ls` e `docker inspect flask-tp` |
-| `evidence/network/05-curl-local.png` | `curl http://127.0.0.1:5000` |
-| `evidence/web/06-acesso-notebook.png` | navegador do notebook exibindo a frase |
-| `evidence/evidencias-tp.txt` | saída do `tp-evidencias` nos três boots |
-| `evidence/hashes.txt` | SHA-256 do `flask-tp.tar` e do `sdcard.img` |
+| `evidence/evidencias-tp.txt` | saída do `tp-evidencias` em cada boot |
+| `evidence/hashes.txt` | SHA-256 do `tp-distance.tar` e do `sdcard.img` do build final |
+| `evidence/build/` | conferências automáticas: usuários, kernel, sequência de boot |
 
-Para tirar o `evidencias-tp.txt` da placa: desligar, pôr o microSD no PC e copiar
-`/home/aluno/evidencias-tp.txt` da segunda partição.
+**Sobre o hash:** o `evidence/hashes.txt` descreve sempre o último build feito no repositório. Para
+que ele corresponda ao cartão apresentado, o `scripts/04-build-image.sh` tem de ser **o último
+script executado antes do commit final** — gravar o cartão e depois recompilar troca a imagem e
+invalida o registro. O `scripts/05-flash-sd.sh` recusa a gravação se o hash registrado não for o da
+imagem em disco, e grava em `evidence/build/cartao-gravado.txt` a comparação com o que leu de volta
+do cartão.
 
 ## Diagnóstico por sintoma
 
@@ -78,9 +126,15 @@ Para tirar o `evidencias-tp.txt` da placa: desligar, pôr o microSD no PC e copi
 |---|---|---|
 | Banner não aparece | `/etc/issue` não entrou no overlay | `BR2_ROOTFS_OVERLAY`, caminho do arquivo |
 | Não consigo logar | `users_table.txt` ou shell errado | `/etc/passwd`, `/etc/shadow` |
-| `eth0` sem IP | DHCP ou cabo; `wait-delay` removido | `/etc/network/interfaces`, `ip link` |
+| `/dev/hcsr04` não existe | módulo não carregou, ou overlay não carregou | `lsmod \| grep hcsr04`, `dmesg \| grep -i hcsr04`, `ls /proc/device-tree/hcsr04` |
+| `cat /dev/hcsr04` trava ou dá erro | ECHO sem retorno: ligação ou divisor | conferir o divisor; o driver devolve erro após 100 ms |
+| Distância sempre ~6500 | sem obstáculo no alcance, ou ECHO não chega ao GPIO | apontar para uma parede; conferir o pino 18 |
+| `wlan0` não existe | `brcmfmac` não carregou, ou firmware ausente | `lsmod \| grep brcmfmac`, `dmesg \| grep -i brcmf`, `ls /lib/firmware/brcm/` |
+| SSID não aparece | `hostapd` não subiu | `hostapd -dd /etc/hostapd.conf` na mão, mensagem do `S70tp-ap` |
+| Cliente conecta mas não recebe IP | `dnsmasq` não subiu | `ps \| grep dnsmasq`, `/var/log/messages` |
+| Celular diz "sem internet" e sai da rede | esperado: o AP não tem NAT | usar notebook, ou desligar dados móveis |
 | `dockerd` não inicia | recurso de kernel faltando | `docker info`, `evidence/build/kernel-check-config.txt` |
 | `exec format error` | imagem do container em amd64 | `docker image inspect`; reconstruir com `--platform linux/arm64` |
-| `curl` funciona na placa, mas não de fora | Flask em `127.0.0.1` ou porta não publicada | `app.py`, `docker ps` |
-| Container não volta após reboot | `S99flask-tp` sem `+x` ou sem `docker start` | `ls -l /etc/init.d/`, `docker ps -a` |
+| Dashboard mostra "Falha: /dev/hcsr04 não existe" | container sem `--device`, ou módulo não carregado | `docker inspect tp-distance`, `ls -l /dev/hcsr04` |
+| Container não volta após reboot | `S99tp-app` sem `+x`, ou container antigo sem device | `ls -l /etc/init.d/`, `docker ps -a` |
 | Primeiro boot parece travado | `docker load` em andamento | esperar 1 a 2 minutos |

@@ -1,4 +1,4 @@
-# 06 — Procedimento de compilação
+# Procedimento de compilação e gravação
 
 O critério do TP é: *outro aluno conseguiria reconstruir a imagem usando apenas este repositório e
 esta documentação?* O que segue é o caminho completo, do clone ao cartão gravado.
@@ -39,7 +39,7 @@ cd tp8-rpi4
 ```
 
 A ordem entre `02` e `03` é indiferente, mas **os dois têm que rodar antes do `04`**: é o `03` que
-deposita o `flask-tp.tar` no overlay, e é o `04` que o assa dentro da imagem.
+deposita o `tp-distance.tar` no overlay, e é o `04` que o assa dentro da imagem.
 
 ## O que cada script faz
 
@@ -48,9 +48,9 @@ deposita o `flask-tp.tar` no overlay, e é o `04` que o assa dentro da imagem.
 | `00-setup-host.sh` | pacotes de build, Docker, `buildx`, binfmt ARM64 | sim |
 | `01-fetch-buildroot.sh` | baixa e extrai o Buildroot em `buildroot/` | não |
 | `02-configure.sh` | gera identidade, mescla fragments, salva e testa a defconfig, grava `VERSION` e `buildroot-config/` | não |
-| `03-build-flask-image.sh` | `docker buildx` ARM64, testa o container, exporta o tar, registra o hash | não (precisa do grupo `docker`) |
-| `04-build-image.sh` | `make` do Buildroot, confere o rootfs gerado, registra o hash | não |
-| `05-flash-sd.sh` | grava `sdcard.img` no cartão com dupla confirmação | sim (apenas o `dd`) |
+| `03-build-flask-image.sh` | `docker buildx` ARM64, testa a API e o dashboard no container emulado, exporta o tar, registra o hash | não (precisa do grupo `docker`) |
+| `04-build-image.sh` | `make` do Buildroot e as conferências do artefato gerado; registra o hash | não |
+| `05-flash-sd.sh` | grava `sdcard.img` no cartão, com dupla confirmação, e **lê o cartão de volta para comparar** | sim (apenas o `dd` e a leitura) |
 
 Nenhuma etapa do build roda como root. O `lib.sh` recusa execução com `sudo`.
 
@@ -72,7 +72,12 @@ O `04` não termina sem verificar o artefato real, lendo o `images/rootfs.ext4` 
 - `aluno` e grupo `docker` presentes em `/etc/passwd` e `/etc/group`
   (prova em [../evidence/build/usuarios-na-imagem.txt](../evidence/build/usuarios-na-imagem.txt));
 - `wait-delay` presente no `/etc/network/interfaces`;
-- `S60dockerd`, `S99flask-tp`, `flask-tp.tar`, `docker` e `curl` no lugar;
+- `S60dockerd`, `S55hcsr04`, `S70tp-ap`, `S99tp-app`, `tp-distance.tar`, `docker` e `curl` no
+  lugar, todos com modo `0755`;
+- driver, overlay de Device Tree, firmware do Wi-Fi e arquivos de configuração do AP conferidos um
+  a um — a lista completa está em [testes.md](testes.md);
+- sequência de boot registrada em
+  [../evidence/build/boot-na-imagem.txt](../evidence/build/boot-na-imagem.txt);
 - kernel aprovado no `check-config.sh` do Docker
   (saída em [../evidence/build/kernel-check-config.txt](../evidence/build/kernel-check-config.txt));
 - espaço livre suficiente no rootfs para o `docker load` do primeiro boot.
@@ -84,11 +89,12 @@ artefato real, e é nela que o usuário existe.
 
 | Artefato | Caminho | Tamanho |
 |---|---|---|
-| Imagem do container | `br2-external/board/tp/rpi4/rootfs-overlay/opt/docker/flask-tp.tar` | 48 MB |
+| Imagem do container | `br2-external/board/tp/rpi4/rootfs-overlay/opt/docker/tp-distance.tar` | 48 MB |
 | Imagem do cartão | `output-rpi4/images/sdcard.img` | 1,1 GB |
 
 Os SHA-256 de ambos ficam em [../evidence/hashes.txt](../evidence/hashes.txt), reescritos a cada
-geração. Nenhum dos dois vai para o Git: são artefatos de build.
+geração — ou seja, aquele arquivo descreve sempre o **último build**, e por isso o `04` tem de ser
+o último script a rodar antes do commit final. Nenhum dos dois vai para o Git: são artefatos de build.
 
 Vale registrar o limite disso: build de Docker **não** é reprodutível byte a byte — timestamps e
 metadados de instalação variam entre execuções. Reconstruir o projeto gera uma imagem equivalente e

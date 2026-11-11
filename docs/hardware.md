@@ -76,6 +76,9 @@ percorre o caminho de ida e volta:
 distância_mm ≈ Δt_µs × 343 / 2000
 ```
 
+Como o driver mede esse tempo — interrupção nas duas bordas do ECHO, prazo limite e a conta em
+inteiros de 64 bits — está em [driver.md](driver.md).
+
 ## Cuidados de montagem
 
 - Conferir a ligação **antes** de energizar: 5 V no pino errado danifica a placa.
@@ -84,3 +87,18 @@ distância_mm ≈ Δt_µs × 343 / 2000
   reinícios que parecem falha de software.
 - Manter o sensor apontado para uma superfície livre durante os testes; obstáculos muito próximos
   (abaixo de ~2 cm) ficam fora da faixa útil do módulo.
+- **Sem obstáculo no alcance**, o HC-SR04 mantém o ECHO alto por cerca de 38 ms antes de desistir,
+  o que o driver converte em algo perto de 6,5 m. Uma leitura nessa ordem de grandeza não é defeito:
+  é o sensor dizendo que não encontrou nada. O dashboard marca essa condição como fora da faixa
+  útil.
+
+## Cartão de montagem, para o dia
+
+| HC-SR04 | Raspberry Pi 4 | Pino físico |
+|---|---|---|
+| VCC | 5 V | 2 |
+| TRIG | GPIO23 | 16 |
+| ECHO | GPIO24 **via divisor** | 18 |
+| GND | GND | 6 |
+
+Divisor: ECHO → 1 kΩ → ponto do GPIO24 → 2 kΩ → GND.
