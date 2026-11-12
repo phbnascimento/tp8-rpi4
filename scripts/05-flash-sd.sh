@@ -9,6 +9,17 @@
 source "$(dirname "$0")/lib.sh"
 require_not_root
 
+# --rapido pula a leitura de volta. A conferência lê 1,1 GB do cartão, o que
+# custa quase o mesmo que a gravação: é metade do tempo total. Para iterar
+# durante o desenvolvimento, vale pular; para o cartão que vai ser apresentado,
+# não — é a única prova de que o cartão tem a imagem que o hash registra.
+CONFERIR=sim
+case "${1:-}" in
+  -r|--rapido) CONFERIR=nao ;;
+  "")          ;;
+  *)           die "opção desconhecida: $1 (use --rapido para pular a conferência)" ;;
+esac
+
 IMG="$OUT_DIR/images/sdcard.img"
 [ -f "$IMG" ] || die "não achei $IMG — rode ./scripts/04-build-image.sh"
 
@@ -76,9 +87,16 @@ for p in $(lsblk -n -l -o NAME "/dev/$DEV" | tail -n +2); do
   sudo umount "/dev/$p" 2>/dev/null || true
 done
 
+# bs=16M em vez de 4M: menos chamadas e menos idas e voltas ao controlador do
+# cartão. Em leitores USB comuns a diferença é de alguns por cento — o grosso do
+# tempo é o cartão, não o programa.
 info "Gravando $(du -h "$IMG" | cut -f1) em /dev/$DEV..."
-sudo dd if="$IMG" of="/dev/$DEV" bs=4M status=progress conv=fsync
+T_GRAVACAO=$(date +%s)
+sudo dd if="$IMG" of="/dev/$DEV" bs=16M status=progress conv=fsync
 sync
+T_GRAVACAO=$(( $(date +%s) - T_GRAVACAO ))
+IMG_SIZE="$(stat -c %s "$IMG")"
+info "gravação: ${T_GRAVACAO}s ($(( IMG_SIZE / 1048576 / (T_GRAVACAO > 0 ? T_GRAVACAO : 1) )) MB/s)"
 
 # Conferência de verdade: lê de volta do cartão exatamente o número de bytes da
 # imagem e compara os hashes. Dois detalhes são essenciais:
@@ -86,22 +104,35 @@ sync
 #     bytes a mais e o hash nunca bateria;
 #   blockdev --flushbufs — descarta o cache de bloco, senão a leitura vem da
 #     memória e a conferência não prova nada sobre o cartão.
-IMG_SIZE="$(stat -c %s "$IMG")"
+if [ "$CONFERIR" = "nao" ]; then
+  warn "conferência pulada (--rapido): não há prova de que o cartão recebeu a imagem.
+  Para o cartão da apresentação, rode sem --rapido."
+  checkpoint "cartão gravado em ${T_GRAVACAO}s, SEM conferência.
+  Ordem para ligar a Pi: microSD → sensor → monitor/teclado → fonte por último."
+  exit 0
+fi
+
 info "Lendo $IMG_SIZE bytes de volta do cartão para conferir (demora)..."
+T_CONFERENCIA=$(date +%s)
 # O set -e abortaria aqui se o flushbufs falhasse, já com o cartão gravado, e sem
 # explicar nada — então a falha vira aviso: a comparação ainda roda, mas pode
 # estar lendo da memória em vez do cartão.
 sudo blockdev --flushbufs "/dev/$DEV" \
   || warn "não deu para descartar o cache de bloco de /dev/$DEV: a leitura abaixo
   pode vir da memória, e então ela não prova que o cartão está íntegro."
-CARD_HASH="$(sudo dd if="/dev/$DEV" bs=4M iflag=count_bytes count="$IMG_SIZE" status=none \
+# Sem iflag=direct de propósito: ele exige leitura alinhada ao setor lógico, e o
+# último bloco desta imagem tem 512 bytes — num leitor com setor de 4096 a
+# leitura falharia e acusaria erro numa gravação correta. Quem garante que a
+# leitura vem do cartão, e não da memória, é o flushbufs acima.
+CARD_HASH="$(sudo dd if="/dev/$DEV" bs=16M iflag=count_bytes count="$IMG_SIZE" status=none \
   | sha256sum | awk '{print $1}')"
+T_CONFERENCIA=$(( $(date +%s) - T_CONFERENCIA ))
 [ "$CARD_HASH" = "$IMG_HASH" ] \
   || die "o conteúdo do cartão não bate com a imagem:
   imagem: $IMG_HASH
   cartão: $CARD_HASH
   A gravação falhou ou o cartão tem defeito. Não apresente este cartão."
-info "cartão confere byte a byte com a imagem ✔"
+info "cartão confere byte a byte com a imagem ✔ (conferência: ${T_CONFERENCIA}s)"
 
 mkdir -p "$EVID_BUILD_DIR"
 {
@@ -112,8 +143,9 @@ mkdir -p "$EVID_BUILD_DIR"
   echo "SHA-256 da imagem:      $IMG_HASH"
   echo "SHA-256 lido do cartão: $CARD_HASH"
   echo "resultado: iguais"
+  echo "tempos: gravação ${T_GRAVACAO}s, conferência ${T_CONFERENCIA}s"
 } > "$EVID_BUILD_DIR/cartao-gravado.txt"
 info "registrado em evidence/build/cartao-gravado.txt"
 
-checkpoint "cartão gravado e conferido ($IMG_HASH).
+checkpoint "cartão gravado e conferido em $(( T_GRAVACAO + T_CONFERENCIA ))s ($IMG_HASH).
   Ordem para ligar a Pi: microSD → cabo Ethernet → monitor/teclado → fonte por último."
