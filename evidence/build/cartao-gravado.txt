@@ -1,0 +1,8 @@
+--- gravação do microSD ---
+data: 2026-11-11 21:40:31
+dispositivo: /dev/sda (31 GB)
+imagem: output-rpi4/images/sdcard.img (1107296768 bytes)
+SHA-256 da imagem:      0dab5c697b9aa570e6fc30183155fbe3cfdd821d48a7e190745f8cef17f6c23c
+SHA-256 lido do cartão: 0dab5c697b9aa570e6fc30183155fbe3cfdd821d48a7e190745f8cef17f6c23c
+resultado: iguais
+tempos: gravação 85s, conferência 64s

@@ -150,7 +150,11 @@ nosso, roda depois:
    sensor** — um container com `--device` não inicia se o device sumiu, e um sem `--device` nunca
    enxergaria o sensor. Fora disso, remove e recria;
 5. `docker start` se casa; senão `docker run -d --restart unless-stopped
-   [--device /dev/hcsr04:/dev/hcsr04] -p 80:5000 tp-distance:1.0`.
+   [--device /dev/hcsr04:/dev/hcsr04] -p 80:5000 tp-distance:1.0`;
+6. **confere que o container ficou de pé.** Se não ficou, apaga a imagem, recarrega do tar e
+   recria. Uma imagem quebrada — por exemplo um `docker load` interrompido por queda de energia
+   no primeiro boot — deixa a tag existindo com camadas incompletas: o container entra em laço de
+   reinício e, como a tag nunca muda, o `load` dos boots seguintes seria pulado para sempre.
 
 O ramo do `docker start` não é redundante: no desligamento o `rcK` chama a ação `stop`, e um
 `docker stop` marca o container como parado pelo usuário — estado em que a política

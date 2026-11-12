@@ -83,6 +83,28 @@ start_app() {
 		docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 	fi
 
+	criar_container || return 1
+
+	# Conferir que o container REALMENTE ficou de pé, e não só que o "docker
+	# run" voltou zero. Uma imagem quebrada — por exemplo um "docker load"
+	# interrompido num boot anterior, que deixa a tag existindo com camadas
+	# incompletas — faz o container entrar em laço de reinício, e o S99 nunca
+	# saberia. Como a tag nunca muda, o load do boot seguinte seria pulado e a
+	# imagem quebrada ficaria para sempre.
+	container_de_pe && return 0
+
+	echo "[TP] o container não ficou de pé; recarregando a imagem do $TAR"
+	docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+	docker rmi -f "$IMAGE" >/dev/null 2>&1 || true
+	docker load -i "$TAR" || return 1
+	criar_container || return 1
+
+	container_de_pe && return 0
+	echo "[TP] continua caindo. Veja: docker logs $CONTAINER"
+	return 1
+}
+
+criar_container() {
 	echo "[TP] criando container $CONTAINER na porta $PORTA"
 	# shellcheck disable=SC2086  # ARGS_DEVICE precisa ser dividido em palavras
 	docker run -d \
@@ -91,6 +113,16 @@ start_app() {
 		$ARGS_DEVICE \
 		-p "$PORTA:5000" \
 		"$IMAGE" >/dev/null
+}
+
+container_de_pe() {
+	i=0
+	while [ "$i" -lt 25 ]; do
+		docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER" && return 0
+		i=$((i + 1))
+		sleep "$INTERVALO"
+	done
+	return 1
 }
 
 stop_app() {

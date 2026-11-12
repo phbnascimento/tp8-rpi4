@@ -150,6 +150,15 @@ for linha in 'console=tty1' 'console=ttyAMA0,115200' 'quiet'; do
   grep -qF "$linha" "$BOARD_DIR/cmdline_tp.txt" \
     || die "cmdline_tp.txt está sem \"$linha\""
 done
+# A ordem importa, e NÃO pode ser invertida. O /dev/console é a última console
+# da lista. O /etc/inittab tem um getty em "console" e outro em "tty1"; se o
+# /dev/console for o próprio tty1, os dois gettys disputam o mesmo teclado e a
+# mesma tela — o login fica ilegível, com caracteres trocados entre os prompts.
+# Foi testado numa placa real: com tty1 por último, digitar "aluno" produzia
+# "aPassword:" e a senha ecoava na tela.
+grep -qE 'console=tty1[^|]*console=ttyAMA0,115200' "$BOARD_DIR/cmdline_tp.txt" \
+  || die "no cmdline_tp.txt, o console=ttyAMA0 tem de vir DEPOIS do console=tty1:
+  senão o /dev/console vira o tty1 e dois gettys disputam o mesmo console." 
 
 # --- 5. Salva a defconfig do TP -------------------------------------------
 br_make BR2_DEFCONFIG="$EXT_DIR/configs/$DEFCONFIG_NAME" savedefconfig

@@ -2,4 +2,4 @@
 # feito neste repositório, não a entrega do TP 8. O registro da entrega está na
 # branch entrega-tp8 e na tag tp8-final.
 367425081e136069624eeb01ee3ff9351b65ed934987da171c87bcaf1e9e6d92  tp-distance.tar
-476fdbc5e3aafb05599d4973a16c67cc2af910bf59b91bb8acf28b4686fbbff0  sdcard.img
+0dab5c697b9aa570e6fc30183155fbe3cfdd821d48a7e190745f8cef17f6c23c  sdcard.img

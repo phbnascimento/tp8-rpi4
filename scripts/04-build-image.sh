@@ -179,7 +179,7 @@ for linha in 'quiet' 'loglevel=3' 'console=tty1'; do
   Se você mudou cmdline_tp.txt, o pacote precisa ser reinstalado:
     make -C buildroot O=../output-rpi4 BR2_EXTERNAL=../br2-external rpi-firmware-reinstall all"
 done
-for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04' 'disable_splash=1' 'boot_delay=0' 'initial_turbo=30'; do
+for linha in 'kernel=Image' 'arm_64bit=1' 'dtoverlay=hcsr04' 'disable_splash=1' 'boot_delay=0'; do
   grep -qxF "$linha" "$FW/config.txt" \
     || die "o config.txt da imagem está sem \"$linha\".
   Se você mudou config_tp.txt, o pacote precisa ser reinstalado:

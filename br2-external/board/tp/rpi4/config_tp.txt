@@ -36,9 +36,10 @@ dtoverlay=hcsr04
 # --- Tempo de boot ----------------------------------------------------
 # disable_splash: não desenha o arco-íris antes de entregar o controle.
 # boot_delay: o firmware não espera antes de carregar o kernel.
-# initial_turbo: mantém o clock máximo nos primeiros 30 s, o que acelera a
-#   leitura do kernel do cartão e a inicialização. Exige fonte adequada —
-#   com fonte fraca, clock alto no boot pode causar reinício.
+# initial_turbo foi testado e REMOVIDO: ele força clock máximo nos primeiros
+#   30 s, aumentando o consumo enquanto a fonte ainda estabiliza. Numa placa
+#   real apareceram teclado USB falhando e HDMI em resolução errada — sintomas
+#   clássicos de alimentação marginal. O ganho era ~1 s, estimado e nunca
+#   medido; não compensa o risco no dia da apresentação.
 disable_splash=1
 boot_delay=0
-initial_turbo=30

@@ -56,7 +56,15 @@ BR2_PACKAGE_HCSR04_DRIVER=y
 BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_TP_PATH)/board/tp/rpi4/config_tp.txt"
 
 # --- Bootloaders → rpi-firmware → cmdline.txt -------------------------
-# Mesma linha de comando do padrão da Raspberry, mais "quiet loglevel=3".
+# Duas mudanças sobre o padrão da Raspberry.
+#
+# A ordem das consoles é a do padrão da Raspberry e NÃO pode ser invertida: o
+# /dev/console é a última da lista, e o /etc/inittab tem um getty em "console"
+# e outro em "tty1". Com tty1 por último, os dois gettys caem no mesmo
+# dispositivo e disputam teclado e tela — testado numa placa, o login fica
+# ilegível. O preço é que as mensagens [TP] do boot saem só pela serial.
+#
+# A mudança aqui é só o "quiet loglevel=3".
 # O kernel escreve o log em DUAS consoles, uma delas serial a 115200 baud, e
 # cada printk é transmitido de forma síncrona: um log de 20 KB custa cerca de
 # 2 s de boot mesmo sem nada ligado na serial. O "quiet" não apaga nada — as
